@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slack-objects"
+# version = "0.0.1"  # Remove any existing version parameter.
+dynamic = ["version"]
+authors = [
+{name="Marcos E. Mercado", email="marcos_elias@hotmail.com"},
+]
+description = "This package defines classes for working with slack objects like users, conversations, messages, etc."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers=[
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]  # Update these accordingly
+keywords = ["slack, "objects", "classes", "slack objects", "utilities", "slack utilities", "slack object types", "slack types", "types"]
+dependencies = [
+"slack-bolt",
+"slack-sdk",
+]
+
+[tool.setuptools_scm]
+version_file = "src/slack-objects/_version.py"
+local_scheme = "no-local-version"
+version_scheme = "post-release"
