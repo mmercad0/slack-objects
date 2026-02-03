@@ -19,7 +19,6 @@ classifiers=[
 ]  # Update these accordingly
 keywords = ["slack, "objects", "classes", "slack objects", "utilities", "slack utilities", "slack object types", "slack types", "types"]
 dependencies = [
-"slack-bolt",
 "slack-sdk",
 ]
 
