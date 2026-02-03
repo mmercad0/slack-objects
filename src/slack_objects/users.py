@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from .base import SlackObjectBase
+from base import SlackObjectBase
 
 
 @dataclass

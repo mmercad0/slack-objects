@@ -1,8 +1,8 @@
 from slack_sdk import WebClient
 import logging
 
-from .api_caller import SlackApiCaller
-from .users import Users
+from api_caller import SlackApiCaller
+from users import Users
 #from .channels import Channels
 #from .files import Files
 #from .messages import Messages
