@@ -1,5 +1,4 @@
-from slack_objects.config import SlackObjectsConfig
-from slack_objects.client import SlackObjectsClient
+from slack_objects import SlackObjectsConfig, SlackObjectsClient
 
 cfg = SlackObjectsConfig(
     bot_token ="xoxb-your-bot-token",

@@ -17,7 +17,7 @@ classifiers=[
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]  # Update these accordingly
-keywords = ["slack, "objects", "classes", "slack objects", "utilities", "slack utilities", "slack object types", "slack types", "types"]
+keywords = ["slack", "objects", "classes", "slack objects", "utilities", "slack utilities", "slack object types", "slack types", "types"]
 dependencies = [
 "slack-sdk",
 ]

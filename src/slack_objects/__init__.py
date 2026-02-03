@@ -1,5 +1,5 @@
 from .client import SlackObjectsClient
-from .config import SlackObjectsConfig, RateTier, IdPGroupConfig
+from .config import SlackObjectsConfig, RateTier #, IdPGroupConfig
 
 from .users import Users
 #from .conversations import Conversations

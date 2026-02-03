@@ -1,5 +1,3 @@
-#from config import SlackObjectsConfig
-#from client import SlackObjectsClient
 from slack_objects import SlackObjectsConfig, SlackObjectsClient
 
 cfg = SlackObjectsConfig(

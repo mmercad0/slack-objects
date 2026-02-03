@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, Mapping
 
-from config import RateTier
+from .config import RateTier
 
 
 @dataclass(frozen=True)

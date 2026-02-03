@@ -3,8 +3,8 @@ from typing import Any, Callable, Optional
 
 from slack_sdk.errors import SlackApiError
 
-from config import SlackObjectsConfig, RateTier
-from rate_limits import DEFAULT_RATE_POLICY, RateLimitPolicy
+from .config import SlackObjectsConfig, RateTier
+from .rate_limits import DEFAULT_RATE_POLICY, RateLimitPolicy
 
 
 class SlackApiCaller:

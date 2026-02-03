@@ -1,0 +1,200 @@
+Metadata-Version: 2.4
+Name: slack-objects
+Version: 0.0.post11
+Summary: This package defines classes for working with slack objects like users, conversations, messages, etc.
+Author-email: "Marcos E. Mercado" <marcos_elias@hotmail.com>
+Keywords: slack,objects,classes,slack objects,utilities,slack utilities,slack object types,slack types,types
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: slack-sdk
+Dynamic: license-file
+
+# slack-objects
+
+A focused Python package for working with **Slack objects** commonly used in administration and automation workflows.
+
+The following Slack object types will be supported:
+
+- **Users**
+- **Conversations**
+- **Messages**
+- **Files**
+- **Workspaces**
+- **IDP_groups**
+
+
+---
+
+## Overview
+
+`slack-objects` provides lightweight, reusable classes that wrap Slack Web API, Admin API, and SCIM operations in a consistent, object-oriented way. It is designed for:
+
+- Slack administration automation
+- Identity and access management flows
+- Internal tooling and bots
+- Auditing and cleanup scripts
+
+The package does **not** aim to be a full Slack SDK replacement. Instead, it focuses on common higher-level tasks that typically require multiple API calls and boilerplate logic.
+
+---
+
+## Requirements
+
+- Python **3.9+**
+- Slack app with appropriate scopes
+- Tokens provided via environment variables or from Azure KeyVault using PC_Azure package (`python -m pip install PC_Azure`)
+
+Typical dependencies:
+- `slack_sdk`
+- `requests`
+- `python-dotenv` (optional)
+- `PC_Azure` (optional)
+
+---
+
+## Installation
+
+```bash
+pip install -r requirements.txt
+```
+
+## Classes and usage
+
+### `Users`
+
+Purpose: actions related to Slack users.
+
+Constructor:
+```python
+Users(global_vars, client, logger, user_id="")
+```
+
+Key methods:
+- `is_contingent_worker()` → bool using name/display name label `[External]`.
+- `is_guest()` → bool if `is_restricted` or `is_ultra_restricted`.
+- `make_multi_channel_guest(token, scim_version='v1')` → `requests.Response` via SCIM (v1/v2).
+- `remove_from_channels(token, client, logger, channel_ids)` → remove user from channels (admin API).
+- `remove_from_workspaces(client, logger, workspace_ids, keep=[])` → remove user from workspaces.
+- `ap_studio_process()` → composite flow: convert to MCG, remove from org-wide channels, remove from other workspaces.
+- `get_userId_from_email(email)` → Slack user ID or empty string.
+- `is_user_authorized(service_name, auth_level='read')` → bool based on IdP group membership.
+- `invite_user(channel_ids, email, team_id, email_password_policy_enabled=False)` → invite a user, returns response string.
+
+Example:
+```python
+u = Users(global_vars, client, logger, user_id="U123")
+if u.is_contingent_worker():
+    u.make_multi_channel_guest(token=global_vars.user_token)
+```
+
+### `Conversations`
+
+Purpose: actions related to conversations (e.g., channels).
+
+Constructor:
+```python
+Conversations(global_vars, client, logger, channel_id)
+```
+
+Key methods:
+- `is_private()` → bool.
+- `get_messages(channel_id="", include_all_metadata=False, limit=None, inclusive=True, latest=None, oldest=None)` → list of messages using `conversations.history` with pagination.
+
+Example:
+```python
+ch = Conversations(global_vars, client, logger, channel_id="C123")
+msgs = ch.get_messages(limit=100)
+```
+
+### `Messages`
+
+Purpose: manage Slack messages and blocks.
+
+Constructor:
+```python
+Messages(global_vars, client, logger, channel_id, ts, message=None)
+```
+
+Key methods:
+- `update_message(as_user=True, channel_id="", message_ts="", new_message_blocks=[], new_message_text="", new_message_attachments="")` → update message via `chat.update`.
+- `replace_message_block(blocks=[], block_type="", block_id="", text="", new_block={}, new_block_id="")` → find a block by type or id and replace it, then update message.
+
+Example:
+```python
+msg = Messages(global_vars, client, logger, "C123", "1717000000.000100")
+msg.update_message(new_message_text="Updated content")
+```
+
+### `Files`
+
+Purpose: interact with files in Slack.
+
+Constructor:
+```python
+Files(global_vars, client, logger, file_id="", get_content=False)
+```
+
+Key methods:
+- `get_text_content()` → fetch content for text files via `url_private` (uses bot token).
+- `upload_to_slack(title, channel="", thread_ts="")` → upload the current file content via `files_upload_v2`.
+- `delete_file(file_id="")` → delete a file by id.
+- `list_files(**args)` → simple wrapper around `files.list`.
+- `get_file_source_message(channel: Channels, file_id="", user_id="")` → find the message where a file was shared (looks back ~5 messages).
+
+Example:
+```python
+f = Files(global_vars, client, logger, file_id="F123", get_content=True)
+f.upload_to_slack(title="Processed file", channel="C123")
+```
+
+### `Workspaces`
+
+Purpose: workspace info helper.
+
+Constructor:
+```python
+Workspaces(client, logger, workspace_id)
+```
+
+Obtains attributes via `team.info`.
+
+### `IDP_groups`
+
+Purpose: manage IdP (Okta) groups via SCIM.
+
+Constructor:
+```python
+IDP_groups(global_vars)
+```
+
+Key methods:
+- `get_groups()` → list of `{ 'group id', 'group name' }` (paginated).
+- `get_members(group_id)` → list of members with `value` (user id) and `display` (name).
+- `is_member(user_id, group_id)` → bool.
+
+Example:
+```python
+idp = IDP_groups(global_vars)
+if idp.is_member("U123", "GP456"):
+    print("authorized")
+```
+
+## Tokens and rate limits
+
+- Methods that call admin or SCIM APIs require the User OAuth token.
+- Standard Web API calls may use the Bot token via `App.client`.
+- Some methods respect internal wait times (e.g., `Tier_2`, `Tier_3`, `Tier_4`) to avoid rate limits. Configure these in `libraries_and_globals.py`.
+
+## Error handling
+
+- Methods catch `SlackApiError` and log messages via the provided `logger`.
+- Some methods post audit logs to channels configured in `global_vars`.
+
+## Notes
+
+- SCIM version: production uses `v1`, sandbox may use `v2`.
+- `Files.get_text_content()` is designed for `text/*` mimetypes.

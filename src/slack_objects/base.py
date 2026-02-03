@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from typing import Optional
 from slack_sdk import WebClient
 
-from api_caller import SlackApiCaller
-from config import SlackObjectsConfig
+from .api_caller import SlackApiCaller
+from .config import SlackObjectsConfig
 
 
 @dataclass
