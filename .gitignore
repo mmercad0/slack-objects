@@ -7,3 +7,7 @@
 *.pyproj
 /.vs/slack-objects/CopilotIndices/18.3.494.57194
 /src/slack_objects/__pycache__
+/.vs/CopilotSnapshots/*
+/.vs/CopilotIndices/*
+/.vs/slack-objects/CopilotIndices/18.3.494.57194/CodeChunks.db
+/.vs/slack-objects/CopilotIndices/18.3.494.57194/SemanticSymbols.db
