@@ -64,6 +64,15 @@ class Users(SlackObjectBase):
     # Optional requests session (handy for unit tests and connection pooling)
     scim_session: requests.Session = field(default_factory=requests.Session, repr=False)
 
+    def __post_init__(self) -> None:
+        super().__post_init__()
+
+        # Eagerly load attributes if we have a user_id
+        if self.user_id:
+            # will raise RuntimeError if users.info fails
+            self.refresh()
+
+
     # ---------- factory helpers ----------
 
     def with_user(self, user_id: str) -> "Users":
