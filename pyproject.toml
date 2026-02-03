@@ -23,6 +23,6 @@ dependencies = [
 ]
 
 [tool.setuptools_scm]
-version_file = "src/slack-objects/_version.py"
+version_file = "src/slack_objects/_version.py"
 local_scheme = "no-local-version"
 version_scheme = "post-release"
