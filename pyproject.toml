@@ -20,6 +20,7 @@ classifiers=[
 keywords = ["slack", "objects", "classes", "slack objects", "utilities", "slack utilities", "slack object types", "slack types", "types"]
 dependencies = [
 "slack-sdk",
+"PC_Utils",
 ]
 
 [tool.setuptools_scm]
