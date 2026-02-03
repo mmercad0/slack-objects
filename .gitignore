@@ -5,3 +5,5 @@
 /.vs/slack-objects.slnx
 *.slnx
 *.pyproj
+/.vs/slack-objects/CopilotIndices/18.3.494.57194
+/src/slack_objects/__pycache__
