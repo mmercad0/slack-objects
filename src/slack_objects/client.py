@@ -5,11 +5,11 @@ from typing import Optional
 from .config import SlackObjectsConfig
 from .api_caller import SlackApiCaller
 from .users import Users
-#from .channels import Channels
-#from .files import Files
-#from .messages import Messages
-#from .workspaces import Workspaces
-#from .idp_groups import IDP_groups
+from .messages import Messages
+from .conversations import Conversations
+from .files import Files
+from .workspaces import Workspaces
+from .idp_groups import IDP_groups
 
 
 class SlackObjectsClient:
@@ -26,15 +26,10 @@ class SlackObjectsClient:
         self.api = SlackApiCaller(cfg)
 
     def users(self, user_id: Optional[str] = None) -> Users:
-        """
-        Factory method:
-            users = slack.users()          -> shared unbound instance
-            user  = slack.users("U123")    -> bound instance sharing context
-        """
         return Users(self.cfg, self.web_client, self.logger, self.api)
 
-    def channels(self) -> Channels:
-        return Channels(self.cfg, self.web_client, self.logger, self.api)
+    def conversations(self) -> Conversations:
+        return Conversations(self.cfg, self.web_client, self.logger, self.api)
 
     def files(self) -> Files:
         return Files(self.cfg, self.web_client, self.logger, self.api)

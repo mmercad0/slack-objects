@@ -183,6 +183,22 @@ class Users(SlackObjectBase):
         """Wrapper for conversations.kick."""
         return self.api.call(self.client, "conversations.kick", rate_tier=RateTier.TIER_3, user=user_id, channel=channel_id)
 
+    def _admin_users_set_expiration(self, *, user_id: str, expiration_ts: int, workspace_id: str = "") -> Dict[str, Any]:
+        """Wrapper for admin.users.setExpiration."""
+        payload: Dict[str, Any] = {
+            "expiration_ts": expiration_ts,
+            "user_id": user_id,
+        }
+        if workspace_id:
+            payload["team_id"] = workspace_id
+
+        return self.api.call(
+            self.client,
+            "admin.users.setExpiration",
+            rate_tier=RateTier.TIER_2,
+            **payload,
+        )
+
     def _discovery_user_conversations(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Wrapper for discovery.user.conversations."""
         return self.api.call(self.client, "discovery.user.conversations", rate_tier=RateTier.TIER_3, **payload)
@@ -238,6 +254,49 @@ class Users(SlackObjectBase):
         attrs = self._require_attributes()
         return bool(attrs.get("is_restricted") or attrs.get("is_ultra_restricted"))
 
+    # ---------- auth helpers ----------
+
+    def is_user_authorized(self, service_name: str, auth_level: str = "read") -> bool:
+        """
+        Determine whether the bound user is authorized for a service.
+
+        Authorization is based on IdP group membership, using policy defined in cfg.
+
+        Expected config shape:
+            cfg.auth_idp_groups_read_access:  dict[str, list[str]]
+            cfg.auth_idp_groups_write_access: dict[str, list[str]]
+
+        This method intentionally delegates all membership checks to IDP_groups.
+        """
+        if not self.user_id:
+            raise ValueError("is_user_authorized requires a bound user_id")
+
+        # Resolve policy
+        if auth_level == "write":
+            group_ids = getattr(self.cfg, "auth_idp_groups_write_access", {}).get(service_name, [])
+        else:
+            group_ids = getattr(self.cfg, "auth_idp_groups_read_access", {}).get(service_name, [])
+
+        if not group_ids:
+            return False
+
+        # Lazy import to avoid circular dependencies
+        from .idp_groups import IDP_groups
+
+        idp = IDP_groups(
+            cfg=self.cfg,
+            client=self.client,
+            logger=self.logger,
+            api=self.api,
+        )
+
+        for group_id in group_ids:
+            if idp.is_member(user_id=self.user_id, group_id=group_id):
+                return True
+
+        return False
+
+
     # ---------- admin api helpers ----------
 
     def invite_user(
@@ -291,6 +350,27 @@ class Users(SlackObjectBase):
     def remove_from_conversation(self, user_id: str, channel_id: str) -> Dict[str, Any]:
         """conversations.kick"""
         return self._conversations_kick(user_id=user_id, channel_id=channel_id)
+
+    def set_guest_expiration_date(self, expiration_date: str, user_id: Optional[str] = None, workspace_id: str = "") -> Dict[str, Any]:
+        """
+        Set the expiration date for a guest user (admin.users.setExpiration).
+
+        Args:
+            expiration_date: A date string accepted by PC_Utils.Datetime.Datetime.date_to_epoch(). Default is %Y-%m-%d
+            user_id: Optional override; if omitted, uses the bound self.user_id
+            workspace_id: Optional team/workspace ID for multi-workspace orgs
+        """
+        uid = user_id or self.user_id
+        if not uid:
+            raise ValueError("set_guest_expiration_date requires user_id (passed or bound)")
+
+        # Lazy import: keeps slack-objects importable even if PC_Utils isn't installed,
+        # as long as this method isn't called.
+        from PC_Utils.Datetime import Datetime
+
+        expiration_ts = Datetime.date_to_epoch(expiration_date)
+        return self._admin_users_set_expiration(user_id=uid, expiration_ts=expiration_ts, workspace_id=workspace_id)
+
 
     # ---------- discovery helper ----------
 
