@@ -5,6 +5,8 @@ pyproject.toml
 pytest.ini
 .vs/VSWorkspaceState.json
 .vs/slnx.sqlite
+dist/slack_objects-0.0.post31-py3-none-any.whl
+dist/slack_objects-0.0.post31.tar.gz
 src/slack_objects/__init__.py
 src/slack_objects/_version.py
 src/slack_objects/api_caller.py
