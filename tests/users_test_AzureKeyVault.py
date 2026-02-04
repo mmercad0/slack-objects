@@ -1,8 +1,8 @@
 from PC_Azure import Azure_Key_Vault as Key_Vault
 from slack_objects import SlackObjectsConfig, SlackObjectsClient
 
-slack_key_vault = Key_Vault("ABK-Slack")    #Your Azure Key Vault name
-secret_name = "Slack-Grid-Administration-PROD-User-OAuth-Token"
+slack_key_vault = Key_Vault("Your-Azure-KeyVault-Name")    #Your Azure Key Vault name
+secret_name = "Your-Secret-Name"
 
 cfg = SlackObjectsConfig(
     user_token=slack_key_vault.get_secret(secret_name)
