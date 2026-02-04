@@ -9,7 +9,7 @@ dynamic = ["version"]
 authors = [
 {name="Marcos E. Mercado", email="marcos_elias@hotmail.com"},
 ]
-description = "This package defines classes for working with slack objects like users, conversations, messages, etc."
+description = "Opinionated, testable Python wrappers for Slack’s Web, Admin, and SCIM APIs, organized by object domain (users, conversations, messages, files, workspaces, and IdP groups). Designed for automation and administration workflows."
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers=[
