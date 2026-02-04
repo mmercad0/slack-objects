@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: slack-objects
-Version: 0.0.post11
+Version: 0.0.post31
 Summary: This package defines classes for working with slack objects like users, conversations, messages, etc.
 Author-email: "Marcos E. Mercado" <marcos_elias@hotmail.com>
 Keywords: slack,objects,classes,slack objects,utilities,slack utilities,slack object types,slack types,types
@@ -11,6 +11,7 @@ Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: slack-sdk
+Requires-Dist: PC_Utils
 Dynamic: license-file
 
 # slack-objects
