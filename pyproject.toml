@@ -21,7 +21,6 @@ keywords = ["slack", "objects", "classes", "slack objects", "utilities", "slack 
 dependencies = [
 "slack-sdk",
 "PC_Utils",
-"PC_Azure",
 ]
 
 [tool.setuptools_scm]
