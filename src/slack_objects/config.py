@@ -1,5 +1,6 @@
 from enum import Enum
 from dataclasses import dataclass
+from typing import Optional
 
 class RateTier(float, Enum):
 	"""
@@ -16,10 +17,13 @@ class RateTier(float, Enum):
 @dataclass(frozen=True)
 class SlackObjectsConfig:
 	"""
-	Configuration settings for Slack objects.
+	Configuration settings for slack-objects.
+
+	Tokens are optional at construction time.
+	Individual methods will raise clear errors if a required token is missing.
 	"""
-	bot_token: str
-	user_token: str
-	scim_token: str
+	bot_token: Optional[str] = None
+	user_token: Optional[str] = None
+	scim_token: Optional[str] = None
 
 	default_rate_tier: RateTier = RateTier.TIER_2

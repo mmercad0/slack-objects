@@ -19,6 +19,9 @@ class SlackObjectsClient:
     """
 
     def __init__(self, cfg: SlackObjectsConfig, logger: logging.Logger | None = None):
+        if not cfg.bot_token:
+            raise ValueError("SlackObjectsConfig must have a bot_token for SlackObjectsClient")
+
         self.cfg = cfg
         self.logger = logger or logging.getLogger("slack-objects")
 
