@@ -293,7 +293,6 @@ class Files(SlackObjectBase):
 
         Parameters:
         - conversation: an object with `.channel_id` and a `get_messages(channel_id, limit=...)` method.
-          (In your new package this will likely be a Conversations helper instance.)
         - file_id: defaults to bound self.file_id
         - user_id: defaults to file uploader (attributes['user']) if attributes are loaded
         - limit: how many recent messages to scan (legacy default ~5)
@@ -301,6 +300,12 @@ class Files(SlackObjectBase):
         Side effects:
         - Sets self.source_message if found
         - Returns the message dict if found, else None
+
+        This method calls:
+            conversation.get_messages(channel_id=..., limit=...)
+
+        Note:
+        - `get_messages` uses keyword-only arguments.
         """
         fid = file_id or self.file_id
         if not fid:
@@ -311,7 +316,7 @@ class Files(SlackObjectBase):
         if uid is None and self.attributes:
             uid = self.attributes.get("user")
 
-        messages = conversation.get_messages(conversation.channel_id, limit=limit)
+        messages = conversation.get_messages(channel_id=conversation.channel_id, limit=limit)
 
         for msg in messages:
             files = msg.get("files")
