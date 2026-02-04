@@ -2,184 +2,140 @@
 
 A focused Python package for working with **Slack objects** commonly used in administration and automation workflows.
 
-The following Slack object types will be supported:
+`slack-objects` provides **opinionated, testable wrappers** around the Slack Web API, Admin API, and SCIM API—favoring object-based access over raw endpoint calls.
+
+---
+
+## Supported Slack Objects
+
+The following Slack object types are supported:
 
 - **Users**
-- **Conversations**
+- **Conversations** (e.g, channels)
 - **Messages**
 - **Files**
 - **Workspaces**
-- **IDP_groups**
-
+- **IDP Groups** (SCIM - e.g., Okta groups)
 
 ---
 
 ## Overview
 
-`slack-objects` provides lightweight, reusable classes that wrap Slack Web API, Admin API, and SCIM operations in a consistent, object-oriented way. It is designed for:
+`slack-objects` is designed for:
 
 - Slack administration automation
-- Identity and access management flows
+- Identity and access management (IAM) workflows
 - Internal tooling and bots
 - Auditing and cleanup scripts
 
-The package does **not** aim to be a full Slack SDK replacement. Instead, it focuses on common higher-level tasks that typically require multiple API calls and boilerplate logic.
+This package is **not** a replacement for `slack_sdk`.
+Instead, it focuses on higher-level object operations that typically require:
+
+- multiple API calls
+- pagination
+- rate limiting
+- Admin API or SCIM usage
+- non-trivial orchestration logic
 
 ---
 
-## Requirements
+## Design Highlights
 
-- Python **3.9+**
-- Slack app with appropriate scopes
-- Tokens provided via environment variables or from Azure KeyVault using PC_Azure package (`python -m pip install PC_Azure`)
+### Factory-based API
 
-Typical dependencies:
-- `slack_sdk`
-- `requests`
-- `python-dotenv` (optional)
-- `PC_Azure` (optional)
+All object helpers are created from a single entry point:
+
+```python
+from slack_objects.client import SlackObjectsClient
+
+slack = SlackObjectsClient(cfg)
+
+users = slack.users()
+alice = slack.users("U123")
+
+conversations = slack.conversations()
+general = slack.conversations("C123")
+```
+
+This avoids global state while keeping usage concise and consistent.
+
+---
+
+### Explicit token model
+
+Slack APIs have different authorization requirements.
+This package keeps tokens **explicit and separate**:
+
+| Token | Used for |
+|-----|---------|
+| `bot_token` | Slack Web API (most read/write operations) |
+| `user_token` | Slack Admin API |
+| `scim_token` | Slack SCIM API (IdP / provisioning) |
+
+Tokens are **optional in configuration**, but **required by methods that need them**.
+Errors are raised at call time with clear messages.
+
+---
+
+### Strict method boundaries
+
+Each object follows a consistent internal structure:
+
+```
+public method
+    → wrapper method
+        → SlackApiCaller / SCIM request
+```
+
+---
+
+### Keyword-only APIs
+
+Methods with multiple optional parameters use **keyword-only arguments** to avoid ambiguity and future breaking changes.
+
+---
+
+### Testability
+
+The codebase is designed to be tested **without hitting Slack**.
 
 ---
 
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+pip install slack-objects
 ```
 
-## Classes and usage
+---
 
-### `Users`
+## Configuration
 
-Purpose: actions related to Slack users.
-
-Constructor:
 ```python
-Users(global_vars, client, logger, user_id="")
+from slack_objects.config import SlackObjectsConfig, RateTier
+
+cfg = SlackObjectsConfig(
+    bot_token="xoxb-...",
+    user_token="xoxp-...",
+    scim_token="xoxp-...",
+    default_rate_tier=RateTier.TIER_3,
+)
 ```
 
-Key methods:
-- `is_contingent_worker()` → bool using name/display name label `[External]`.
-- `is_guest()` → bool if `is_restricted` or `is_ultra_restricted`.
-- `make_multi_channel_guest(token, scim_version='v1')` → `requests.Response` via SCIM (v1/v2).
-- `remove_from_channels(token, client, logger, channel_ids)` → remove user from channels (admin API).
-- `remove_from_workspaces(client, logger, workspace_ids, keep=[])` → remove user from workspaces.
-- `ap_studio_process()` → composite flow: convert to MCG, remove from org-wide channels, remove from other workspaces.
-- `get_userId_from_email(email)` → Slack user ID or empty string.
-- `is_user_authorized(service_name, auth_level='read')` → bool based on IdP group membership.
-- `invite_user(channel_ids, email, team_id, email_password_policy_enabled=False)` → invite a user, returns response string.
+---
 
-Example:
-```python
-u = Users(global_vars, client, logger, user_id="U123")
-if u.is_contingent_worker():
-    u.make_multi_channel_guest(token=global_vars.user_token)
+## Testing
+
+Run all smoke tests:
+
+```bash
+python -m tests.run_all_smoke
 ```
 
-### `Conversations`
-
-Purpose: actions related to conversations (e.g., channels).
-
-Constructor:
-```python
-Conversations(global_vars, client, logger, channel_id)
-```
-
-Key methods:
-- `is_private()` → bool.
-- `get_messages(channel_id="", include_all_metadata=False, limit=None, inclusive=True, latest=None, oldest=None)` → list of messages using `conversations.history` with pagination.
-
-Example:
-```python
-ch = Conversations(global_vars, client, logger, channel_id="C123")
-msgs = ch.get_messages(limit=100)
-```
-
-### `Messages`
-
-Purpose: manage Slack messages and blocks.
-
-Constructor:
-```python
-Messages(global_vars, client, logger, channel_id, ts, message=None)
-```
-
-Key methods:
-- `update_message(as_user=True, channel_id="", message_ts="", new_message_blocks=[], new_message_text="", new_message_attachments="")` → update message via `chat.update`.
-- `replace_message_block(blocks=[], block_type="", block_id="", text="", new_block={}, new_block_id="")` → find a block by type or id and replace it, then update message.
-
-Example:
-```python
-msg = Messages(global_vars, client, logger, "C123", "1717000000.000100")
-msg.update_message(new_message_text="Updated content")
-```
-
-### `Files`
-
-Purpose: interact with files in Slack.
-
-Constructor:
-```python
-Files(global_vars, client, logger, file_id="", get_content=False)
-```
-
-Key methods:
-- `get_text_content()` → fetch content for text files via `url_private` (uses bot token).
-- `upload_to_slack(title, channel="", thread_ts="")` → upload the current file content via `files_upload_v2`.
-- `delete_file(file_id="")` → delete a file by id.
-- `list_files(**args)` → simple wrapper around `files.list`.
-- `get_file_source_message(channel: Channels, file_id="", user_id="")` → find the message where a file was shared (looks back ~5 messages).
-
-Example:
-```python
-f = Files(global_vars, client, logger, file_id="F123", get_content=True)
-f.upload_to_slack(title="Processed file", channel="C123")
-```
-
-### `Workspaces`
-
-Purpose: workspace info helper.
-
-Constructor:
-```python
-Workspaces(client, logger, workspace_id)
-```
-
-Obtains attributes via `team.info`.
-
-### `IDP_groups`
-
-Purpose: manage IdP (Okta) groups via SCIM.
-
-Constructor:
-```python
-IDP_groups(global_vars)
-```
-
-Key methods:
-- `get_groups()` → list of `{ 'group id', 'group name' }` (paginated).
-- `get_members(group_id)` → list of members with `value` (user id) and `display` (name).
-- `is_member(user_id, group_id)` → bool.
-
-Example:
-```python
-idp = IDP_groups(global_vars)
-if idp.is_member("U123", "GP456"):
-    print("authorized")
-```
-
-## Tokens and rate limits
-
-- Methods that call admin or SCIM APIs require the User OAuth token.
-- Standard Web API calls may use the Bot token via `App.client`.
-- Some methods respect internal wait times (e.g., `Tier_2`, `Tier_3`, `Tier_4`) to avoid rate limits. Configure these in `libraries_and_globals.py`.
-
-## Error handling
-
-- Methods catch `SlackApiError` and log messages via the provided `logger`.
-- Some methods post audit logs to channels configured in `global_vars`.
+---
 
 ## Notes
 
-- SCIM version: production uses `v1`, sandbox may use `v2`.
-- `Files.get_text_content()` is designed for `text/*` mimetypes.
+- SCIM v1 is the default; v2 is supported where applicable
+- Guest expiration dates use `PC_Utils.Datetime` if installed
+- This package is intended for automation and administration workflows
