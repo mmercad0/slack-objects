@@ -11,3 +11,4 @@
 /.vs/CopilotIndices/*
 /.vs/slack-objects/CopilotIndices/*
 /.vs/slack-objects/CopilotIndices/*
+/tests/__pycache__
