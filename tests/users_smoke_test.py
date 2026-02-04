@@ -42,13 +42,20 @@ def _install_pc_utils_datetime_stub() -> None:
 
 def _force_idp_groups_to_use_fake_scim_session() -> None:
     """
-    Ensure any new IDP_groups instance created inside Users.is_user_authorized()
-    uses FakeScimSession instead of a real requests.Session.
+    Ensure any IDP_groups created inside Users.is_user_authorized uses FakeScimSession.
+    Patching requests.Session alone can miss because the dataclass default_factory may already
+    hold the original callable.
     """
     import slack_objects.idp_groups as idp_mod
+    from tests._smoke_harness import FakeScimSession
 
-    # Monkeypatch the Session constructor used by IDP_groups' default_factory
-    idp_mod.requests.Session = lambda: FakeScimSession()  # type: ignore[assignment]
+    original_init = idp_mod.IDP_groups.__init__
+
+    def patched_init(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        self.scim_session = FakeScimSession()
+
+    idp_mod.IDP_groups.__init__ = patched_init  # type: ignore[assignment]
 
 
 def main() -> None:

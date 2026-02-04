@@ -205,14 +205,17 @@ class FakeHttpSession:
 
 class FakeScimSession:
     """
-    Used by IDP_groups._scim_request -> scim_session.request().
+    Used by IDP_groups._scim_request and Users._scim_request via scim_session.request().
     We simulate:
       - GET Groups (paginated)
       - GET Groups/{id}
+    
+    Accepts 'data=' because Users._scim_request uses requests-style JSON via data=json.dumps(...).
     """
 
-    def request(self, method: str, url: str, headers=None, params=None, json=None, timeout=None):
-        params = params or {}
+    def request(self, method: str, url: str, **kwargs):
+        # kwargs may include: headers, params, json, data, timeout, etc.
+        params = kwargs.get("params") or {}
 
         class Resp:
             def __init__(self, payload: Dict[str, Any]):
@@ -227,7 +230,7 @@ class FakeScimSession:
             def json(self):
                 return self._payload
 
-        # Group detail
+        # Group detail (IDP_groups.get_members / is_member)
         if "Groups/" in url:
             return Resp({"members": [{"value": "U1", "display": "User One"}, {"value": "U2", "display": "User Two"}]})
 
