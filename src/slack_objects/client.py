@@ -19,29 +19,32 @@ class SlackObjectsClient:
     """
 
     def __init__(self, cfg: SlackObjectsConfig, logger: logging.Logger | None = None):
-        if not cfg.bot_token:
-            raise ValueError("SlackObjectsConfig must have a bot_token for SlackObjectsClient")
-
         self.cfg = cfg
         self.logger = logger or logging.getLogger("slack-objects")
 
-        self.web_client = WebClient(token=cfg.bot_token)
+        # Prefer bot token for general Web API calls; fall back to user token.
+        web_token = cfg.bot_token or cfg.user_token
+        if not web_token:
+            raise ValueError("SlackObjectsClient requires cfg.bot_token or cfg.user_token.")
+
+        self.web_client = WebClient(token=web_token)
         self.api = SlackApiCaller(cfg)
 
     def users(self, user_id: Optional[str] = None) -> Users:
-        return Users(self.cfg, self.web_client, self.logger, self.api)
+        base = Users(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger)
+        return base if user_id is None else base.with_user(user_id)
 
     def conversations(self) -> Conversations:
-        return Conversations(self.cfg, self.web_client, self.logger, self.api)
+        return Conversations(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger)
 
     def files(self) -> Files:
-        return Files(self.cfg, self.web_client, self.logger, self.api)
+        return Files(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger)
 
     def messages(self) -> Messages:
-        return Messages(self.cfg, self.web_client, self.logger, self.api)
+        return Messages(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger)
 
     def workspaces(self) -> Workspaces:
-        return Workspaces(self.cfg, self.web_client, self.logger, self.api)
+        return Workspaces(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger)
 
     def idp_groups(self) -> IDP_groups:
-        return IDP_groups(self.cfg, self.logger)
+        return IDP_groups(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger)

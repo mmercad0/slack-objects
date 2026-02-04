@@ -17,11 +17,15 @@ class SlackApiCaller:
         self.cfg = cfg
         self.policy = policy
 
-    def call(self, client, method: str, *, rate_tier: Optional[RateTier] = None, **kwargs) -> dict:
+    def call(self, client, method: str, *, rate_tier: Optional[RateTier] = None, use_json: bool = False, **kwargs) -> dict:
         tier = rate_tier or self.policy.tier_for(method) or self.cfg.default_rate_tier
 
         try:
-            resp = client.api_call(method, json=kwargs)
+            if use_json:
+                resp = client.api_call(method, json=kwargs)
+            else:
+                resp = client.api_call(method, params=kwargs)
+
             data = resp.data if hasattr(resp, "data") else resp
 
             # Space out subsequent calls
