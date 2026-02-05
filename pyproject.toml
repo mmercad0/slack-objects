@@ -6,21 +6,34 @@ build-backend = "setuptools.build_meta"
 name = "slack-objects"
 # version = "0.0.1"  # Remove any existing version parameter.
 dynamic = ["version"]
+
 authors = [
 {name="Marcos E. Mercado", email="marcos_elias@hotmail.com"},
 ]
+
 description = "Opinionated, testable Python wrappers for Slack’s Web, Admin, and SCIM APIs, organized by object domain (users, conversations, messages, files, workspaces, and IdP groups). Designed for automation and administration workflows."
 readme = "README.md"
 requires-python = ">=3.8"
+
 classifiers=[
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]  # Update these accordingly
+
 keywords = ["slack", "objects", "classes", "slack objects", "utilities", "slack utilities", "slack object types", "slack types", "types"]
+
 dependencies = [
 "slack-sdk",
 "PC_Utils",
+"requests",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "build",
+  "twine",
 ]
 
 [tool.setuptools_scm]
