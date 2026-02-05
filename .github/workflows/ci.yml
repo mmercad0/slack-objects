@@ -12,13 +12,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # important for setuptools-scm + tags
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
       - name: Install
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]" # || pip install -e .
+
       - name: Run smoke tests
         run: |
           python -m tests.run_all_smoke
