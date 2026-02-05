@@ -43,3 +43,4 @@ dev = [
 version_file = "src/slack_objects/_version.py"
 local_scheme = "no-local-version"
 version_scheme = "guess-next-dev"
+tag_regex = "^v(?P<version>\\d+\\.\\d+\\.\\d+(?:rc\\d+)?)$"
