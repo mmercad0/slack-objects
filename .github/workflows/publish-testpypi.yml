@@ -1,37 +1,37 @@
-name: Publish to PyPI
+name: Publish to TestPyPI
 
 on:
   release:
-    types: [published]
+    types: [prereleased]
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
 
     environment:
-      name: pypi
-      url: https://pypi.org/p/slack-objects
+      name: testpypi
 
     permissions:
-      id-token: write  # REQUIRED for trusted publishing
+      id-token: write   # REQUIRED for trusted publishing
       contents: read
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.release.tag_name }}
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install build tools
+      - name: Build
         run: |
           python -m pip install --upgrade pip
           pip install build
+          python -m build
 
-      - name: Build distributions
-        run: python -m build
-
-      - name: Publish to PyPI
+      - name: Publish
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
