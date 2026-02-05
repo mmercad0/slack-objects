@@ -13,7 +13,7 @@ authors = [
 
 description = "Opinionated, testable Python wrappers for Slack’s Web, Admin, and SCIM APIs, organized by object domain (users, conversations, messages, files, workspaces, and IdP groups). Designed for automation and administration workflows."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 classifiers=[
     "Programming Language :: Python :: 3",
@@ -30,6 +30,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+#pc_utils = [
+#  "PC_Utils",
+#]
 dev = [
   "pytest",
   "build",
