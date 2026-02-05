@@ -12,3 +12,8 @@
 /.vs/slack-objects/CopilotIndices/*
 /.vs/slack-objects/CopilotIndices/*
 /tests/__pycache__
+
+# Python packaging artifacts
+dist/
+build/
+*.egg-info/
