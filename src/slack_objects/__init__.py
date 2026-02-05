@@ -1,22 +1,11 @@
-from .client import SlackObjectsClient
-from .config import SlackObjectsConfig, RateTier #, IdPGroupConfig
+from ._version import __version__
 
-from .users import Users
-#from .conversations import Conversations
-#from .messages import Messages
-#from .files import Files
-#from .workspaces import Workspaces
-#from .idp_groups import IDP_groups
+from .client import SlackObjectsClient
+from .config import SlackObjectsConfig, RateTier
 
 __all__ = [
+    "__version__",
     "SlackObjectsClient",
     "SlackObjectsConfig",
     "RateTier",
-    "IdPGroupConfig",
-    "Users",
-    "Channels",
-    "Messages",
-    "Files",
-    "Workspaces",
-    "IDP_groups",
 ]
