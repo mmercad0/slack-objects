@@ -416,13 +416,9 @@ class Users(SlackObjectBase):
     # SCIM (requests) - already modular via _scim_request
     # ============================================================
 
-    def _scim_base_url(self, scim_version: str) -> str:
-        """Return SCIM base URL, allowing config override."""
-        if scim_version == "v2" and getattr(self.cfg, "scim_base_url_v2", None):
-            return self.cfg.scim_base_url_v2.rstrip("/") + "/"
-        if scim_version == "v1" and getattr(self.cfg, "scim_base_url_v1", None):
-            return self.cfg.scim_base_url_v1.rstrip("/") + "/"
-        return f"https://api.slack.com/scim/{scim_version}/"
+    def _scim_base_url(self) -> str:
+        """Return the SCIM base URL with the version segment appended."""
+        return f"{self.cfg.scim_base_url.rstrip('/')}/{self.cfg.scim_version}/"
 
     def _scim_request(
         self,
@@ -430,7 +426,6 @@ class Users(SlackObjectBase):
         path: str,
         method: str,
         payload: Optional[Dict[str, Any]] = None,
-        scim_version: str = "v1",
         token: Optional[str] = None,
     ) -> ScimResponse:
         """
@@ -440,14 +435,14 @@ class Users(SlackObjectBase):
         conservative sleep here. If you later unify SCIM throttling with SlackApiCaller, you can
         remove this sleep.
         """
-        tok = token or getattr(self.cfg, "scim_token", None)
+        tok = token or self.cfg.scim_token
         if not tok:
             raise ValueError("SCIM request requires cfg.scim_token (or token override)")
 
         # Simple pacing to avoid bursts (tweak as needed)
         time.sleep(float(RateTier.TIER_2))
 
-        url = self._scim_base_url(scim_version) + path.lstrip("/")
+        url = self._scim_base_url() + path.lstrip("/")
         headers = {
             "Authorization": f"Bearer {tok}",
             "Content-Type": "application/json; charset=utf-8",
@@ -458,7 +453,7 @@ class Users(SlackObjectBase):
             url=url,
             headers=headers,
             data=json.dumps(payload) if payload is not None else None,
-            timeout=getattr(self.cfg, "http_timeout_seconds", 30),
+            timeout=self.cfg.http_timeout_seconds,
         )
 
         text = resp.text or ""
@@ -470,8 +465,9 @@ class Users(SlackObjectBase):
         ok = resp.ok and (data.get("Errors") is None)
         return ScimResponse(ok=ok, status_code=resp.status_code, data=data, text=text)
 
-    def scim_create_user(self, username: str, email: str, scim_version: str = "v1") -> ScimResponse:
+    def scim_create_user(self, username: str, email: str) -> ScimResponse:
         """SCIM POST Users"""
+        scim_version = self.cfg.scim_version
         if scim_version == "v2":
             payload: Dict[str, Any] = {
                 "schemas": [
@@ -495,11 +491,11 @@ class Users(SlackObjectBase):
         else:
             raise NotImplementedError(f"Invalid SCIM version: {scim_version}")
 
-        return self._scim_request(path="Users", method="POST", payload=payload, scim_version=scim_version)
+        return self._scim_request(path="Users", method="POST", payload=payload)
 
-    def scim_deactivate_user(self, user_id: str, scim_version: str = "v1") -> ScimResponse:
+    def scim_deactivate_user(self, user_id: str) -> ScimResponse:
         """SCIM DELETE Users/<id>"""
-        return self._scim_request(path=f"Users/{user_id}", method="DELETE", scim_version=scim_version)
+        return self._scim_request(path=f"Users/{user_id}", method="DELETE")
 
     def scim_update_user_attribute(
         self,
@@ -507,9 +503,9 @@ class Users(SlackObjectBase):
         user_id: str,
         attribute: str,
         new_value: Any,
-        scim_version: str = "v2",
     ) -> ScimResponse:
         """SCIM PATCH Users/<id>"""
+        scim_version = self.cfg.scim_version
         if scim_version == "v2":
             payload = {
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
@@ -520,14 +516,15 @@ class Users(SlackObjectBase):
         else:
             raise NotImplementedError(f"Invalid SCIM version: {scim_version}")
 
-        return self._scim_request(path=f"Users/{user_id}", method="PATCH", payload=payload, scim_version=scim_version)
+        return self._scim_request(path=f"Users/{user_id}", method="PATCH", payload=payload)
 
-    def make_multi_channel_guest(self, user_id: Optional[str] = None, scim_version: str = "v1") -> ScimResponse:
+    def make_multi_channel_guest(self, user_id: Optional[str] = None) -> ScimResponse:
         """Convert a user to a multi-channel guest via SCIM PATCH."""
         uid = user_id or self.user_id
         if not uid:
             raise ValueError("make_multi_channel_guest requires user_id (passed or bound)")
 
+        scim_version = self.cfg.scim_version
         if scim_version == "v2":
             payload = {
                 "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
@@ -551,4 +548,4 @@ class Users(SlackObjectBase):
         else:
             raise NotImplementedError(f"Invalid SCIM version: {scim_version}")
 
-        return self._scim_request(path=f"Users/{uid}", method="PATCH", payload=payload, scim_version=scim_version)
+        return self._scim_request(path=f"Users/{uid}", method="PATCH", payload=payload)

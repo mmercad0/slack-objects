@@ -61,13 +61,9 @@ class IDP_groups(SlackObjectBase):
         )
 
     # ---------- SCIM request wrapper ----------
-    def _scim_base_url(self, scim_version: str) -> str:
-        """Return configurable SCIM base URL; default to Slack SCIM endpoints when not overridden."""
-        if scim_version == "v2" and getattr(self.cfg, "scim_base_url_v2", None):
-            return self.cfg.scim_base_url_v2.rstrip("/") + "/"
-        if scim_version == "v1" and getattr(self.cfg, "scim_base_url_v1", None):
-            return self.cfg.scim_base_url_v1.rstrip("/") + "/"
-        return f"https://api.slack.com/scim/{scim_version}/"
+    def _scim_base_url(self) -> str:
+        """Return the SCIM base URL with the version segment appended."""
+        return f"{self.cfg.scim_base_url.rstrip('/')}/{self.cfg.scim_version}/"
 
     def _scim_request(
         self,
@@ -75,7 +71,6 @@ class IDP_groups(SlackObjectBase):
         path: str,
         method: str = "GET",
         payload: Optional[Dict[str, Any]] = None,
-        scim_version: str = "v1",
         token: Optional[str] = None,
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
@@ -85,14 +80,14 @@ class IDP_groups(SlackObjectBase):
         It raises ValueError when token is missing. Network/HTTP errors will raise requests exceptions.
         We add a small sleep based on RateTier to reduce burstiness (keeps legacy cautious behavior).
         """
-        tok = token or getattr(self.cfg, "scim_token", None)
+        tok = token or self.cfg.scim_token
         if not tok:
             raise ValueError("SCIM request requires cfg.scim_token (or token override)")
 
         # conservative sleep to avoid bursts (can be tuned)
         time.sleep(float(RateTier.TIER_2))
 
-        url = self._scim_base_url(scim_version) + path.lstrip("/")
+        url = self._scim_base_url() + path.lstrip("/")
         headers = {
             "Authorization": f"Bearer {tok}",
             "Content-Type": "application/json; charset=utf-8",
@@ -104,7 +99,7 @@ class IDP_groups(SlackObjectBase):
             headers=headers,
             params=params,
             json=payload,
-            timeout=getattr(self.cfg, "http_timeout_seconds", 30),
+            timeout=self.cfg.http_timeout_seconds,
         )
         resp.raise_for_status()
         # best-effort JSON parse; return empty dict if no body
@@ -115,7 +110,7 @@ class IDP_groups(SlackObjectBase):
 
     # ---------- endpoint wrappers (only these call _scim_request) ----------
 
-    def _scim_groups_list(self, *, count: int = 1000, start_index: Optional[int] = None, scim_version: str = "v1") -> Dict[str, Any]:
+    def _scim_groups_list(self, *, count: int = 1000, start_index: Optional[int] = None) -> Dict[str, Any]:
         """
         Wrapper for GET Groups (paginated).
         Accepts pagination params as query parameters according to Slack SCIM docs.
@@ -123,15 +118,15 @@ class IDP_groups(SlackObjectBase):
         params = {"count": count}
         if start_index:
             params["startIndex"] = start_index
-        return self._scim_request(path="Groups", method="GET", params=params, scim_version=scim_version)
+        return self._scim_request(path="Groups", method="GET", params=params)
 
-    def _scim_group_get(self, group_id: str, scim_version: str = "v1") -> Dict[str, Any]:
+    def _scim_group_get(self, group_id: str) -> Dict[str, Any]:
         """Wrapper for GET Groups/{id}"""
-        return self._scim_request(path=f"Groups/{group_id}", method="GET", scim_version=scim_version)
+        return self._scim_request(path=f"Groups/{group_id}", method="GET")
 
     # ---------- public helpers ----------
 
-    def get_groups(self, scim_version: str = "v1", fetch_count: int = 1000) -> List[Dict[str, str]]:
+    def get_groups(self, fetch_count: int = 1000) -> List[Dict[str, str]]:
         """
         Return a list of IdP groups visible to the SCIM token.
 
@@ -147,7 +142,7 @@ class IDP_groups(SlackObjectBase):
         retrieved = 0
 
         while True:
-            resp = self._scim_groups_list(count=fetch_count, start_index=start_index, scim_version=scim_version)
+            resp = self._scim_groups_list(count=fetch_count, start_index=start_index)
 
             # Slack SCIM returns 'Resources' (list) and 'totalResults' and 'startIndex' values.
             resources = resp.get("Resources", []) or []
@@ -173,7 +168,7 @@ class IDP_groups(SlackObjectBase):
 
         return groups_out
 
-    def get_members(self, group_id: Optional[str] = None, scim_version: str = "v1") -> List[Dict[str, str]]:
+    def get_members(self, group_id: Optional[str] = None) -> List[Dict[str, str]]:
         """
         Return the members of a group as a list of dicts `{'value': <user_id>, 'display': <name>}`.
 
@@ -183,16 +178,16 @@ class IDP_groups(SlackObjectBase):
         if not gid:
             raise ValueError("get_members requires group_id (passed or bound)")
 
-        resp = self._scim_group_get(gid, scim_version=scim_version)
+        resp = self._scim_group_get(gid)
         # In the legacy scripts, group members are at `members` in the response body
         return resp.get("members", [])
 
-    def is_member(self, user_id: str, group_id: Optional[str] = None, scim_version: str = "v1") -> bool:
+    def is_member(self, user_id: str, group_id: Optional[str] = None) -> bool:
         """
         Return True if `user_id` is a member of `group_id`.
         Preserves legacy semantics (scans the members list).
         """
-        members = self.get_members(group_id=group_id, scim_version=scim_version)
+        members = self.get_members(group_id=group_id)
         for member in members:
             # member dicts historically had 'value' for id
             if member.get("value") == user_id:

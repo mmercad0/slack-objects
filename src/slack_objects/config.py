@@ -2,6 +2,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from typing import Optional
 
+
 class RateTier(float, Enum):
 	"""
 	Slack API rate-tier backoff defaults (seconds). These are defined to conform to Slack Web API rate limits.
@@ -31,6 +32,13 @@ class SlackObjectsConfig:
 	auth_idp_groups_read_access: dict[str, list[str]] = field(default_factory=dict)
 	auth_idp_groups_write_access: dict[str, list[str]] = field(default_factory=dict)
 
+	# SCIM settings
+	scim_base_url: str = "https://api.slack.com/scim"
+	scim_version: str = "v2"
+
+	# HTTP timeout for SCIM and file-download requests (seconds)
+	http_timeout_seconds: int = 30
+
 	def __repr__(self) -> str:
 		""" Modifying the default dataclass __repr__ to mask token values for security. """
 		def _mask(val: Optional[str]) -> str:
@@ -42,5 +50,8 @@ class SlackObjectsConfig:
 			f"scim_token={_mask(self.scim_token)}, "
 			f"default_rate_tier={self.default_rate_tier}, "
 			f"auth_idp_groups_read_access={self.auth_idp_groups_read_access}, "
-			f"auth_idp_groups_write_access={self.auth_idp_groups_write_access})"
+			f"auth_idp_groups_write_access={self.auth_idp_groups_write_access}, "
+			f"scim_base_url={self.scim_base_url}, "
+			f"scim_version={self.scim_version}, "
+			f"http_timeout_seconds={self.http_timeout_seconds})"
 		)
