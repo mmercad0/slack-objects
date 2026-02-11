@@ -17,7 +17,8 @@ class SlackApiCaller:
         self.cfg = cfg
         self.policy = policy
 
-    def call(self, client, method: str, *, rate_tier: Optional[RateTier] = None, use_json: bool = False, **kwargs) -> dict:
+    def call(self, client, method: str, *, rate_tier: Optional[RateTier] = None, use_json: bool = False, _retry_count: int = 0, **kwargs) -> dict:
+        MAX_RETRIES = 5
         tier = rate_tier or self.policy.tier_for(method) or self.cfg.default_rate_tier
 
         try:
@@ -27,16 +28,17 @@ class SlackApiCaller:
                 resp = client.api_call(method, params=kwargs)
 
             data = resp.data if hasattr(resp, "data") else resp
-
-            # Space out subsequent calls
             time.sleep(float(tier))
             return data
 
         except SlackApiError as e:
-            # Handle rate limiting properly
             if e.response is not None and e.response.status_code == 429:
-                retry_after = int(e.response.headers.get("Retry-After", tier))
+                if _retry_count >= MAX_RETRIES:
+                    raise RuntimeError(f"Rate-limited {MAX_RETRIES} times on {method}; giving up.") from e
+                try:
+                    retry_after = int(e.response.headers.get("Retry-After", tier))
+                except (ValueError, TypeError):
+                    retry_after = int(float(tier))
                 time.sleep(retry_after)
-                return self.call(client, method, rate_tier=tier, **kwargs)
-
+                return self.call(client, method, rate_tier=tier, use_json=use_json, _retry_count=_retry_count + 1, **kwargs)
             raise

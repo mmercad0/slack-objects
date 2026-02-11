@@ -24,9 +24,9 @@ classifiers=[
 keywords = ["slack", "objects", "classes", "slack objects", "utilities", "slack utilities", "slack object types", "slack types", "types"]
 
 dependencies = [
-"slack-sdk",
-"PC_Utils",
-"requests",
+    "slack-sdk>=3.27,<4",
+    "PC_Utils>=0.1",
+    "requests>=2.31,<3",
 ]
 
 [project.optional-dependencies]
