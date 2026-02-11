@@ -498,6 +498,28 @@ class Users(SlackObjectBase):
         """SCIM DELETE Users/<id>"""
         return self._scim_request(path=f"Users/{user_id}", method="DELETE")
 
+    def scim_reactivate_user(self, user_id: Optional[str] = None) -> ScimResponse:
+        """Reactivate a deactivated user via SCIM PATCH Users/<id>."""
+        uid = user_id or self.user_id
+        if not uid:
+            raise ValueError("scim_reactivate_user requires user_id (passed or bound)")
+
+        scim_version = self.cfg.scim_version
+        if scim_version == "v2":
+            payload: Dict[str, Any] = {
+                "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                "Operations": [{"op": "replace", "path": "active", "value": True}],
+            }
+        elif scim_version == "v1":
+            payload = {
+                "schemas": ["urn:scim:schemas:core:1.0"],
+                "active": True,
+            }
+        else:
+            raise NotImplementedError(f"Invalid SCIM version: {scim_version}")
+
+        return self._scim_request(path=f"Users/{uid}", method="PATCH", payload=payload)
+
     def scim_update_user_attribute(
         self,
         *,
