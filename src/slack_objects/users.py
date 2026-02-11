@@ -254,6 +254,11 @@ class Users(SlackObjectBase):
         attrs = self._require_attributes()
         return bool(attrs.get("is_restricted") or attrs.get("is_ultra_restricted"))
 
+    def is_active(self) -> bool:
+        """Return True if the user account is not deactivated (deleted)."""
+        attrs = self._require_attributes()
+        return not bool(attrs.get("deleted", False))
+
     # ---------- auth helpers ----------
 
     def is_user_authorized(self, service_name: str, auth_level: str = "read") -> bool:
