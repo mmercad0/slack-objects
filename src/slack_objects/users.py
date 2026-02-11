@@ -439,9 +439,6 @@ class Users(SlackObjectBase):
         if not tok:
             raise ValueError("SCIM request requires cfg.scim_token (or token override)")
 
-        # Simple pacing to avoid bursts (tweak as needed)
-        time.sleep(float(RateTier.TIER_2))
-
         url = self._scim_base_url() + path.lstrip("/")
         headers = {
             "Authorization": f"Bearer {tok}",
@@ -463,6 +460,10 @@ class Users(SlackObjectBase):
             data = {}
 
         ok = resp.ok and (data.get("Errors") is None)
+
+        # Space out subsequent calls (matches SlackApiCaller.call behavior)
+        time.sleep(float(RateTier.TIER_2))
+
         return ScimResponse(ok=ok, status_code=resp.status_code, data=data, text=text)
 
     def scim_create_user(self, username: str, email: str) -> ScimResponse:

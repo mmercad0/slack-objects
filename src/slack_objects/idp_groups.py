@@ -84,9 +84,6 @@ class IDP_groups(SlackObjectBase):
         if not tok:
             raise ValueError("SCIM request requires cfg.scim_token (or token override)")
 
-        # conservative sleep to avoid bursts (can be tuned)
-        time.sleep(float(RateTier.TIER_2))
-
         url = self._scim_base_url() + path.lstrip("/")
         headers = {
             "Authorization": f"Bearer {tok}",
@@ -104,9 +101,14 @@ class IDP_groups(SlackObjectBase):
         resp.raise_for_status()
         # best-effort JSON parse; return empty dict if no body
         try:
-            return resp.json() if resp.text else {}
+            result = resp.json() if resp.text else {}
         except Exception:
-            return {"_raw_text": resp.text or ""}
+            result = {"_raw_text": resp.text or ""}
+
+        # Space out subsequent calls (matches SlackApiCaller.call behavior)
+        time.sleep(float(RateTier.TIER_2))
+
+        return result
 
     # ---------- endpoint wrappers (only these call _scim_request) ----------
 
