@@ -150,12 +150,22 @@ class FakeWebClient:
         if method == "admin.teams.admins.list":
             return {"ok": True, "admin_ids": ["U_ADMIN_1", "U_ADMIN_2"], "response_metadata": {"next_cursor": ""}}
 
-        # Default: ok True
-        return {"ok": True}
-
         # ---------------------------
         # Users
         # ---------------------------
+        if method == "users.info":
+            return {
+                "ok": True,
+                "user": {
+                    "id": payload.get("user", "U_TEST"),
+                    "real_name": "Test User",
+                    "profile": {"display_name": "Testy"},
+                    "is_restricted": False,
+                    "is_ultra_restricted": False,
+                    "deleted": False,
+                },
+            }
+
         if method == "users.lookupByEmail":
             if payload.get("email") == "found@example.com":
                 return {"ok": True, "user": {"id": "U_FOUND"}}
@@ -179,6 +189,9 @@ class FakeWebClient:
                 ],
                 "offset": "",
             }
+
+        # Default: ok True
+        return {"ok": True}
 
 
 class FakeApiCaller:
@@ -207,10 +220,11 @@ class FakeScimSession:
     """
     Used by IDP_groups._scim_request and Users._scim_request via scim_session.request().
     We simulate:
-      - GET Groups (paginated)
-      - GET Groups/{id}
-    
-    Accepts 'data=' because Users._scim_request uses requests-style JSON via data=json.dumps(...).
+      - GET  Groups        (paginated list)
+      - GET  Groups/{id}   (group detail / members)
+      - POST Users         (create)
+      - DELETE Users/{id}  (deactivate)
+      - PATCH Users/{id}   (reactivate / update attribute / make guest)
     """
 
     def request(self, method: str, url: str, **kwargs):
@@ -218,9 +232,9 @@ class FakeScimSession:
         params = kwargs.get("params") or {}
 
         class Resp:
-            def __init__(self, payload: Dict[str, Any]):
+            def __init__(self, payload: Dict[str, Any], status: int = 200):
                 self._payload = payload
-                self.status_code = 200
+                self.status_code = status
                 self.ok = True
                 self.text = "json"
 
@@ -230,6 +244,23 @@ class FakeScimSession:
             def json(self):
                 return self._payload
 
+        method_upper = method.upper()
+
+        # --- SCIM Users endpoints (used by Users SCIM methods) ---
+        if "/Users" in url and "Groups" not in url:
+            if method_upper == "POST":
+                # scim_create_user
+                return Resp({"id": "U_SCIM_NEW", "userName": "testuser"}, 201)
+
+            if method_upper == "DELETE":
+                # scim_deactivate_user
+                return Resp({}, 200)
+
+            if method_upper == "PATCH":
+                # scim_reactivate_user / scim_update_user_attribute / make_multi_channel_guest
+                return Resp({"id": "U1", "active": True}, 200)
+
+        # --- SCIM Groups endpoints (used by IDP_groups) ---
         # Group detail (IDP_groups.get_members / is_member)
         if "Groups/" in url:
             return Resp({"members": [{"value": "U1", "display": "User One"}, {"value": "U2", "display": "User Two"}]})

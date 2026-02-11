@@ -118,6 +118,7 @@ def main() -> None:
         # Classification helpers (need attributes)
         CallSpec("is_contingent_worker()", lambda: (_refresh_bound(), bound.is_contingent_worker())),
         CallSpec("is_guest()", lambda: (_refresh_bound(), bound.is_guest())),
+        CallSpec("is_active()", lambda: (_refresh_bound(), bound.is_active())),
 
         # Admin helpers
         CallSpec(
@@ -134,7 +135,7 @@ def main() -> None:
         CallSpec("get_channels(active_only)", lambda: bound.get_channels("U1", active_only=True)),
         CallSpec("get_channels(all)", lambda: bound.get_channels("U1", active_only=False)),
 
-        # Authorization helper (NEW)
+        # Authorization helper
         CallSpec(
             "is_user_authorized(read)",
             lambda: bound.is_user_authorized("example_service", "read"),
@@ -144,20 +145,21 @@ def main() -> None:
             lambda: bound.is_user_authorized("example_service", "write"),
         ),
 
-        # Guest expiration (NEW) - relies on PC_Utils.Datetime stub above
+        # Guest expiration - relies on PC_Utils.Datetime stub above
         CallSpec(
             "set_guest_expiration_date()",
             lambda: bound.set_guest_expiration_date("2030-01-01", workspace_id="T1"),
         ),
 
-        # SCIM helpers
-        CallSpec("scim_create_user()", lambda: bound.scim_create_user("testuser", "test@example.com", scim_version="v1")),
-        CallSpec("scim_deactivate_user()", lambda: bound.scim_deactivate_user("U1", scim_version="v1")),
+        # SCIM helpers (scim_version now comes from cfg, not a kwarg)
+        CallSpec("scim_create_user()", lambda: bound.scim_create_user("testuser", "test@example.com")),
+        CallSpec("scim_deactivate_user()", lambda: bound.scim_deactivate_user("U1")),
+        CallSpec("scim_reactivate_user()", lambda: bound.scim_reactivate_user()),
         CallSpec(
             "scim_update_user_attribute()",
-            lambda: bound.scim_update_user_attribute(user_id="U1", attribute="active", new_value=False, scim_version="v2"),
+            lambda: bound.scim_update_user_attribute(user_id="U1", attribute="active", new_value=False),
         ),
-        CallSpec("make_multi_channel_guest()", lambda: bound.make_multi_channel_guest(scim_version="v1")),
+        CallSpec("make_multi_channel_guest()", lambda: bound.make_multi_channel_guest()),
     ]
 
     run_smoke("Users smoke (all public methods)", specs)
