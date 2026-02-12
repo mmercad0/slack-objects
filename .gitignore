@@ -21,3 +21,4 @@ src/slack_objects/_version.py
 
 # Live-test config (contains real Slack user IDs)
 /tests/SCIM/live_test_config.json
+/tests/SCIM/__pycache__
