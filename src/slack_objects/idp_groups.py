@@ -17,7 +17,7 @@ This module implements the following functionality:
 
 Design decisions
 ----------------
-- SCIM REST calls are centralized in `_scim_request()`; all public methods call those wrappers (keeps code modular and testable).
+- SCIM REST calls are centralized in ScimMixin._scim_request(); all public methods call endpoint wrappers.
 - Uses an injectable `requests.Session` (`scim_session`) so tests can pass a fake session.
 - Keeps legacy output shapes: lists of dicts for groups and members.
 """
@@ -25,16 +25,14 @@ Design decisions
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-import json
-import time
 import requests
 
 from .base import SlackObjectBase
-from .config import RateTier
+from .scim_base import ScimMixin, ScimResponse, validate_scim_id
 
 
 @dataclass
-class IDP_groups(SlackObjectBase):
+class IDP_groups(ScimMixin, SlackObjectBase):
     """
     IdP (SCIM) groups helper.
 
@@ -60,56 +58,6 @@ class IDP_groups(SlackObjectBase):
             scim_session=self.scim_session,
         )
 
-    # ---------- SCIM request wrapper ----------
-    def _scim_base_url(self) -> str:
-        """Return the SCIM base URL with the version segment appended."""
-        return f"{self.cfg.scim_base_url.rstrip('/')}/{self.cfg.scim_version}/"
-
-    def _scim_request(
-        self,
-        *,
-        path: str,
-        method: str = "GET",
-        payload: Optional[Dict[str, Any]] = None,
-        token: Optional[str] = None,
-        params: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Low-level SCIM request. Returns parsed JSON dict.
-
-        It raises ValueError when token is missing. Network/HTTP errors will raise requests exceptions.
-        We add a small sleep based on RateTier to reduce burstiness (keeps legacy cautious behavior).
-        """
-        tok = token or self.cfg.scim_token
-        if not tok:
-            raise ValueError("SCIM request requires cfg.scim_token (or token override)")
-
-        url = self._scim_base_url() + path.lstrip("/")
-        headers = {
-            "Authorization": f"Bearer {tok}",
-            "Content-Type": "application/json; charset=utf-8",
-        }
-
-        resp = self.scim_session.request(
-            method=method.upper(),
-            url=url,
-            headers=headers,
-            params=params,
-            json=payload,
-            timeout=self.cfg.http_timeout_seconds,
-        )
-        resp.raise_for_status()
-        # best-effort JSON parse; return empty dict if no body
-        try:
-            result = resp.json() if resp.text else {}
-        except Exception:
-            result = {"_raw_text": resp.text or ""}
-
-        # Space out subsequent calls (matches SlackApiCaller.call behavior)
-        time.sleep(float(RateTier.TIER_2))
-
-        return result
-
     # ---------- endpoint wrappers (only these call _scim_request) ----------
 
     def _scim_groups_list(self, *, count: int = 1000, start_index: Optional[int] = None) -> Dict[str, Any]:
@@ -117,14 +65,15 @@ class IDP_groups(SlackObjectBase):
         Wrapper for GET Groups (paginated).
         Accepts pagination params as query parameters according to Slack SCIM docs.
         """
-        params = {"count": count}
+        params: Dict[str, Any] = {"count": count}
         if start_index:
             params["startIndex"] = start_index
-        return self._scim_request(path="Groups", method="GET", params=params)
+        return self._scim_request(path="Groups", method="GET", params=params).data
 
     def _scim_group_get(self, group_id: str) -> Dict[str, Any]:
         """Wrapper for GET Groups/{id}"""
-        return self._scim_request(path=f"Groups/{group_id}", method="GET")
+        validate_scim_id(group_id, "group_id")
+        return self._scim_request(path=f"Groups/{group_id}", method="GET").data
 
     # ---------- public helpers ----------
 

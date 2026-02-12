@@ -7,6 +7,25 @@ from .api_caller import SlackApiCaller
 from .config import SlackObjectsConfig
 
 
+# Keys that are safe to include in error messages (never contain tokens)
+_SAFE_ERROR_KEYS = frozenset({"ok", "error", "needed", "provided", "response_metadata"})
+
+
+def safe_error_context(resp: Any, *, max_len: int = 300) -> str:
+    """
+    Return a truncated, token-free summary of an API response for use in exception messages.
+
+    Only well-known diagnostic keys are kept. The result is capped at *max_len* characters
+    to prevent massive payloads from flooding logs or error-tracking systems.
+    """
+    if isinstance(resp, dict):
+        summary = {k: v for k, v in resp.items() if k in _SAFE_ERROR_KEYS}
+    else:
+        summary = repr(resp)
+    text = str(summary)
+    return text[:max_len] + ("..." if len(text) > max_len else "")
+
+
 @dataclass
 class SlackObjectBase:
     """

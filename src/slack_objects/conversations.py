@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 
-from .base import SlackObjectBase
+from .base import SlackObjectBase, safe_error_context
 from .config import RateTier
 from .messages import Messages
 
@@ -75,7 +75,7 @@ class Conversations(SlackObjectBase):
 
         resp = self.get_conversation_info(self.channel_id)
         if not resp.get("ok"):
-            raise RuntimeError(f"Conversations.get_conversation_info() failed: {resp}")
+            raise RuntimeError(f"Conversations.get_conversation_info() failed: {safe_error_context(resp)}")
 
         self.attributes = resp.get("channel") or {}
         return self.attributes

@@ -18,30 +18,15 @@ This module intentionally covers only user-related operations and helpers.
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Sequence, Union, List
 
-import json
-import time
 import requests
 
-from .base import SlackObjectBase
+from .base import SlackObjectBase, safe_error_context
 from .config import RateTier
+from .scim_base import ScimMixin, ScimResponse, validate_scim_id
 
 
 @dataclass
-class ScimResponse:
-    """
-    Simple structured response for SCIM requests.
-
-    SCIM responses are not Slack Web API responses (no `ok` boolean), so returning a consistent
-    wrapper makes scripts/tests easier to write.
-    """
-    ok: bool
-    status_code: int
-    data: Dict[str, Any]
-    text: str
-
-
-@dataclass
-class Users(SlackObjectBase):
+class Users(ScimMixin, SlackObjectBase):
     """
     Users domain helper.
 
@@ -104,7 +89,7 @@ class Users(SlackObjectBase):
 
         resp = self.get_user_info(self.user_id)
         if not resp.get("ok"):
-            raise RuntimeError(f"Users.get_user_info() failed: {resp}")
+            raise RuntimeError(f"Users.get_user_info() failed: {safe_error_context(resp)}")
 
         self.attributes = resp.get("user") or {}
         return self.attributes
@@ -418,58 +403,8 @@ class Users(SlackObjectBase):
         return current_channels if active_only else all_channels
 
     # ============================================================
-    # SCIM (requests) - already modular via _scim_request
+    # SCIM public methods (use inherited ScimMixin._scim_request)
     # ============================================================
-
-    def _scim_base_url(self) -> str:
-        """Return the SCIM base URL with the version segment appended."""
-        return f"{self.cfg.scim_base_url.rstrip('/')}/{self.cfg.scim_version}/"
-
-    def _scim_request(
-        self,
-        *,
-        path: str,
-        method: str,
-        payload: Optional[Dict[str, Any]] = None,
-        token: Optional[str] = None,
-    ) -> ScimResponse:
-        """
-        Perform a SCIM REST request and return a structured response.
-
-        Note: SCIM rate limiting is separate from Slack Web API rate limiting; we keep a small,
-        conservative sleep here. If you later unify SCIM throttling with SlackApiCaller, you can
-        remove this sleep.
-        """
-        tok = token or self.cfg.scim_token
-        if not tok:
-            raise ValueError("SCIM request requires cfg.scim_token (or token override)")
-
-        url = self._scim_base_url() + path.lstrip("/")
-        headers = {
-            "Authorization": f"Bearer {tok}",
-            "Content-Type": "application/json; charset=utf-8",
-        }
-
-        resp = self.scim_session.request(
-            method=method.upper(),
-            url=url,
-            headers=headers,
-            data=json.dumps(payload) if payload is not None else None,
-            timeout=self.cfg.http_timeout_seconds,
-        )
-
-        text = resp.text or ""
-        try:
-            data = resp.json() if text else {}
-        except Exception:
-            data = {}
-
-        ok = resp.ok and (data.get("Errors") is None)
-
-        # Space out subsequent calls (matches SlackApiCaller.call behavior)
-        time.sleep(float(RateTier.TIER_2))
-
-        return ScimResponse(ok=ok, status_code=resp.status_code, data=data, text=text)
 
     def scim_create_user(self, username: str, email: str) -> ScimResponse:
         """SCIM POST Users"""
@@ -501,6 +436,7 @@ class Users(SlackObjectBase):
 
     def scim_deactivate_user(self, user_id: str) -> ScimResponse:
         """SCIM DELETE Users/<id>"""
+        validate_scim_id(user_id, "user_id")
         return self._scim_request(path=f"Users/{user_id}", method="DELETE")
 
     def scim_reactivate_user(self, user_id: Optional[str] = None) -> ScimResponse:
@@ -508,6 +444,7 @@ class Users(SlackObjectBase):
         uid = user_id or self.user_id
         if not uid:
             raise ValueError("scim_reactivate_user requires user_id (passed or bound)")
+        validate_scim_id(uid, "user_id")
 
         scim_version = self.cfg.scim_version
         if scim_version == "v2":
@@ -533,6 +470,8 @@ class Users(SlackObjectBase):
         new_value: Any,
     ) -> ScimResponse:
         """SCIM PATCH Users/<id>"""
+        validate_scim_id(user_id, "user_id")
+
         scim_version = self.cfg.scim_version
         if scim_version == "v2":
             payload = {
@@ -551,6 +490,7 @@ class Users(SlackObjectBase):
         uid = user_id or self.user_id
         if not uid:
             raise ValueError("make_multi_channel_guest requires user_id (passed or bound)")
+        validate_scim_id(uid, "user_id")
 
         scim_version = self.cfg.scim_version
         if scim_version == "v2":
