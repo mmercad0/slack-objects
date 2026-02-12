@@ -46,8 +46,9 @@ Instead, it focuses on higher-level object operations that typically require:
 All object helpers are created from a single entry point:
 
 ```python
-from slack_objects.client import SlackObjectsClient
+from slack_objects import SlackObjectsClient, SlackObjectsConfig
 
+cfg = SlackObjectsConfig(bot_token="xoxb-...", user_token="xoxp-...", scim_token="xoxp-...", ...)
 slack = SlackObjectsClient(cfg)
 
 users = slack.users()
@@ -136,6 +137,6 @@ python -m tests.run_all_smoke
 
 ## Notes
 
-- SCIM v1 is the default; v2 is supported where applicable
-- Guest expiration dates use `PC_Utils.Datetime` if installed
+- SCIM v2 is the default; v1 is supported where applicable
+- `PC_Utils` is a required dependency (used for datetime handling, e.g., guest expiration dates)
 - This package is intended for automation and administration workflows
