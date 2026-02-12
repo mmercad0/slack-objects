@@ -79,15 +79,18 @@ class ScimMixin:
         url = self._scim_base_url() + path.lstrip("/")
         headers = {
             "Authorization": f"Bearer {tok}",
-            "Content-Type": "application/json; charset=utf-8",
         }
+
+        # Only set Content-Type when there is a body to send.
+        if payload is not None:
+            headers["Content-Type"] = "application/json; charset=utf-8"
 
         resp = self.scim_session.request(
             method=method.upper(),
             url=url,
             headers=headers,
             params=params,
-            json=payload,
+            json=payload if payload is not None else None,
             timeout=self.cfg.http_timeout_seconds,
         )
 
