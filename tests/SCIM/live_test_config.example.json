@@ -1,0 +1,20 @@
+{
+    "team_id":                "T0123456789",
+    "channel_id":             "C0123456789",
+    "idp_group_id":           "",
+
+    "active_member_id":       "U0123456789",
+    "active_member_email":    "member@example.com",
+
+    "active_admin_id":        "U0123456789",
+    "active_owner_id":        "U0123456789",
+
+    "deactivated_user_id":    "U0123456789",
+    "deactivated_user_email": "deactivated@example.com",
+
+    "single_channel_guest_id":"U0123456789",
+    "multi_channel_guest_id": "U0123456789",
+
+    "nonexistent_user_id":    "UXXXXXXXXXX",
+    "nonexistent_email":      "nobody@example.com"
+}
