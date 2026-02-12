@@ -151,11 +151,13 @@ class TestGetMembers:
         _pause()
 
     def test_get_members_bound_group(self, ctx):
-        """get_members() with no arg on a bound IDP_groups instance."""
+        """ get_members() with no arg on a bound IDP_groups instance.
+            It verifies that calling get_members() without passing a group_id argument works correctly on an IDP_groups instance that was constructed with a group_id (i.e., a "bound" instance).
+            It ensures the bound instance uses its stored group_id internally.
+        """
         if not ctx.idp_group_id:
             pytest.skip("idp_group_id not set in live_test_config.json")
 
-        bound = ctx.slack.idp_groups()
         bound_idp = IDP_groups(
             cfg=ctx.cfg,
             client=ctx.slack.web_client,
@@ -317,7 +319,7 @@ class TestWithGroupFactory:
         bound = idp.with_group(ctx.idp_group_id)
         assert bound.group_id == ctx.idp_group_id
 
-    def test_with_group_shares_config(self, ctx, idp):
+    def test_with_group_shares_config(self, idp):
         """with_group should share cfg, client, api, logger."""
         bound = idp.with_group("G_TEST")
         assert bound.cfg is idp.cfg
