@@ -60,20 +60,20 @@ class IDP_groups(ScimMixin, SlackObjectBase):
 
     # ---------- endpoint wrappers (only these call _scim_request) ----------
 
-    def _scim_groups_list(self, *, count: int = 1000, start_index: Optional[int] = None) -> Dict[str, Any]:
+    def _scim_groups_list(self, *, count: int = 1000, start_index: Optional[int] = None) -> ScimResponse:
         """
         Wrapper for GET Groups (paginated).
         Accepts pagination params as query parameters according to Slack SCIM docs.
         """
-        params: Dict[str, Any] = {"count": count}
-        if start_index:
+        params: Dict[str, Any] = {"count": count}   # Number or records to return at a time. Maximum is 1000 https://api.slack.com/changelog/2019-06-have-scim-will-paginate#what
+        if start_index is not None:
             params["startIndex"] = start_index
-        return self._scim_request(path="Groups", method="GET", params=params).data
+        return self._scim_request(path="Groups", method="GET", params=params)   # https://docs.slack.dev/reference/scim-api/#get-groups
 
-    def _scim_group_get(self, group_id: str) -> Dict[str, Any]:
+    def _scim_group_get(self, group_id: str) -> ScimResponse:
         """Wrapper for GET Groups/{id}"""
         validate_scim_id(group_id, "group_id")
-        return self._scim_request(path=f"Groups/{group_id}", method="GET").data
+        return self._scim_request(path=f"Groups/{group_id}", method="GET")      # https://docs.slack.dev/reference/scim-api/#get-groups-id
 
     # ---------- public helpers ----------
 
@@ -93,7 +93,8 @@ class IDP_groups(ScimMixin, SlackObjectBase):
         retrieved = 0
 
         while True:
-            resp = self._scim_groups_list(count=fetch_count, start_index=start_index)
+            scim_resp = self._scim_groups_list(count=fetch_count, start_index=start_index)
+            resp = scim_resp.data
 
             # Slack SCIM returns 'Resources' (list) and 'totalResults' and 'startIndex' values.
             resources = resp.get("Resources", []) or []
@@ -129,9 +130,9 @@ class IDP_groups(ScimMixin, SlackObjectBase):
         if not gid:
             raise ValueError("get_members requires group_id (passed or bound)")
 
-        resp = self._scim_group_get(gid)
+        scim_resp = self._scim_group_get(gid)
         # In the legacy scripts, group members are at `members` in the response body
-        return resp.get("members", [])
+        return scim_resp.data.get("members", [])
 
     def is_member(self, user_id: str, group_id: Optional[str] = None) -> bool:
         """
