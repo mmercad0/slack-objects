@@ -40,12 +40,12 @@ _HERE = Path(__file__).resolve().parent
 _DEFAULT_CONFIG_PATH = _HERE / "live_test_config.json"
 
 # Azure Key Vault
-_KEYVAULT_NAME = "Your-Azure-KeyVault-Name"        # <-- your vault name here
+_KEYVAULT_NAME = "Slack-AI-assistant-KV"
 
-# Key Vault secret names (change if yours differ)
-_SECRET_BOT_TOKEN = "slack-bot-token"
-_SECRET_USER_TOKEN = "slack-user-token"
-_SECRET_SCIM_TOKEN = "slack-scim-token"
+# Key Vault secret names
+_SECRET_BOT_TOKEN = "Bot-token-SB"
+_SECRET_USER_TOKEN = "User-token-SB"
+_SECRET_SCIM_TOKEN = "User-token-SB"
 
 
 # ---------------------------------------------------------------------------
