@@ -23,7 +23,9 @@ from typing import Any, Dict, Optional
 
 import pytest
 import requests
+from unittest.mock import patch
 
+from slack_sdk.errors import SlackApiError
 from slack_objects.users import Users
 
 from conftest_live import LiveTestContext, build_live_context
@@ -172,10 +174,10 @@ class TestScimReactivateUser:
 
     def test_reactivate_deactivated_user_by_email(self, ctx, users):
         """Resolve email → id for a deactivated user, then reactivate + teardown."""
-        # For deactivated users lookupByEmail may fail; fall back to the known ID
+        # For deactivated users lookupByEmail raises SlackApiError; fall back to the known ID
         try:
             uid = _resolve_user_id_from_email(users, ctx.deactivated_user_email)
-        except AssertionError:
+        except (AssertionError, SlackApiError):
             uid = ctx.deactivated_user_id
 
         resp = users.scim_reactivate_user(uid)
@@ -188,8 +190,10 @@ class TestScimReactivateUser:
 
     def test_reactivate_nonexistent_email(self, ctx, users):
         """Resolving a non-existent email should fail before we even call SCIM."""
-        resp = users.lookup_by_email(ctx.nonexistent_email)
-        assert not resp.get("ok"), "Expected lookup to fail for non-existent email"
+        with patch.object(users, "_scim_request", wraps=users._scim_request) as spy:
+            with pytest.raises(SlackApiError, match="users_not_found"):
+                users.lookup_by_email(ctx.nonexistent_email)
+            spy.assert_not_called()
         _pause()
 
     # ----- by display_name (resolved to user_id) -----
@@ -592,10 +596,10 @@ class TestMakeMultiChannelGuest:
         You may need to manually restore the user or use admin.users.setRegular.
         Only run this against disposable/test user accounts.
         """
-        pytest.skip(
-            "Skipped by default: converting a member to MCG is destructive. "
-            "Remove this skip to run against a disposable test user."
-        )
+        #pytest.skip(
+        #    "Skipped by default: converting a member to MCG is destructive. "
+        #    "Remove this skip to run against a disposable test user."
+        #)
         resp = users.make_multi_channel_guest(ctx.active_member_id)
         assert resp.ok, f"Expected ok: {resp.data}"
         _pause()
@@ -668,7 +672,7 @@ class TestMakeMultiChannelGuest:
         try:
             # We use the active member email but resolve it; this tests the pathway
             uid = _resolve_user_id_from_email(users, ctx.active_member_email)
-        except AssertionError:
+        except (AssertionError, SlackApiError):
             pytest.skip("Could not resolve email for MCG test")
         _pause()
 
@@ -712,8 +716,10 @@ class TestScimInputValidation:
         "U<script>",
     ])
     def test_deactivate_rejects_bad_ids(self, users, bad_id):
-        with pytest.raises(ValueError):
-            users.scim_deactivate_user(bad_id)
+        with patch.object(users, "_scim_request", wraps=users._scim_request) as spy:
+            with pytest.raises(ValueError):
+                users.scim_deactivate_user(bad_id)
+            spy.assert_not_called()
 
     @pytest.mark.parametrize("bad_id", [
         "../../admin",
@@ -722,8 +728,10 @@ class TestScimInputValidation:
         "U1;DROP",
     ])
     def test_reactivate_rejects_bad_ids(self, users, bad_id):
-        with pytest.raises(ValueError):
-            users.scim_reactivate_user(bad_id)
+        with patch.object(users, "_scim_request", wraps=users._scim_request) as spy:
+            with pytest.raises(ValueError):
+                users.scim_reactivate_user(bad_id)
+            spy.assert_not_called()
 
     @pytest.mark.parametrize("bad_id", [
         "../traversal",
@@ -731,17 +739,21 @@ class TestScimInputValidation:
         "id with spaces",
     ])
     def test_update_attribute_rejects_bad_ids(self, users, bad_id):
-        with pytest.raises(ValueError):
-            users.scim_update_user_attribute(
-                user_id=bad_id,
-                attribute="displayName",
-                new_value="x",
-            )
+        with patch.object(users, "_scim_request", wraps=users._scim_request) as spy:
+            with pytest.raises(ValueError):
+                users.scim_update_user_attribute(
+                    user_id=bad_id,
+                    attribute="displayName",
+                    new_value="x",
+                )
+            spy.assert_not_called()
 
     @pytest.mark.parametrize("bad_id", [
         "../traversal",
         "",
     ])
     def test_make_mcg_rejects_bad_ids(self, users, bad_id):
-        with pytest.raises(ValueError):
-            users.make_multi_channel_guest(bad_id)
+        with patch.object(users, "_scim_request", wraps=users._scim_request) as spy:
+            with pytest.raises(ValueError):
+                users.make_multi_channel_guest(bad_id)
+            spy.assert_not_called()
