@@ -6,10 +6,9 @@ Test-user IDs and other identifiers are loaded from a JSON file.
 
 Setup
 -----
-1.  Store three secrets in your Azure Key Vault:
-        slack-bot-token      – xoxb-... bot token with admin.* scopes
-        slack-user-token     – xoxp-... user token (org-level admin)
-        slack-scim-token     – xoxp-... token with SCIM provisioning scopes
+1.  Store your Slack tokens in Azure Key Vault:
+        Bot-token-SB         – xoxb-... bot token with users:read and users:read.email scopes
+        User-token-SB        – xoxp-... user token with admin scope (org-level admin + SCIM provisioning)
 
 2.  Set the ``_KEYVAULT_NAME`` constant in this file to your Azure Key Vault name.
 
@@ -17,9 +16,18 @@ Setup
     in the real Slack user/team IDs for your org.  This file is git-ignored and
     never committed.
 
-Usage:
-    python -m pytest tests/SCIM/test_scim_users_live.py -v --tb=short
+Usage (individual files):
+    python -m pytest tests/SCIM/test_scim_users_reactivate_live.py -v --tb=short
+    python -m pytest tests/SCIM/test_scim_users_deactivate_live.py -v --tb=short
+    python -m pytest tests/SCIM/test_scim_users_create_live.py -v --tb=short
+    python -m pytest tests/SCIM/test_scim_users_update_attribute_live.py -v --tb=short
+    python -m pytest tests/SCIM/test_scim_users_make_guest_live.py -v --tb=short
+    python -m pytest tests/SCIM/test_scim_users_input_validation_live.py -v --tb=short
     python -m pytest tests/SCIM/test_scim_idp_groups_live.py -v --tb=short
+
+Usage (run all SCIM Users tests, ordered safest → most destructive):
+    python tests/SCIM/run_all_scim_users_live_tests.py -v --tb=short
+    python tests/SCIM/run_all_scim_users_live_tests.py --stop-on-fail
 """
 
 from __future__ import annotations
@@ -117,6 +125,12 @@ class LiveTestContext:
     nonexistent_user_id: str
     nonexistent_email: str
 
+    # Disposable users — tests may permanently change their type/state
+    disposable_member_id: str
+    disposable_member_email: str
+    disposable_guest_id: str
+    disposable_guest_email: str
+
 
 def build_live_context(
     config_path: Path | None = None,
@@ -162,4 +176,8 @@ def build_live_context(
         multi_channel_guest_id=_require_key(data, "multi_channel_guest_id"),
         nonexistent_user_id=_require_key(data, "nonexistent_user_id"),
         nonexistent_email=_require_key(data, "nonexistent_email"),
+        disposable_member_id=_optional_key(data, "disposable_member_id"),
+        disposable_member_email=_optional_key(data, "disposable_member_email"),
+        disposable_guest_id=_optional_key(data, "disposable_guest_id"),
+        disposable_guest_email=_optional_key(data, "disposable_guest_email"),
     )
