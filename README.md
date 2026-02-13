@@ -48,14 +48,28 @@ All object helpers are created from a single entry point:
 ```python
 from slack_objects import SlackObjectsClient, SlackObjectsConfig
 
-cfg = SlackObjectsConfig(bot_token="xoxb-...", user_token="xoxp-...", scim_token="xoxp-...", ...)
+cfg = SlackObjectsConfig(
+    bot_token="xoxb-...",
+    user_token="xoxp-...",
+    scim_token="xoxp-...",
+    # see SlackObjectsConfig for additional options (scim_base_url, http_timeout_seconds, etc.)
+)
+
 slack = SlackObjectsClient(cfg)
 
-users = slack.users()
-alice = slack.users("U123")
+users = slack.users()       # unbound
+alice = slack.users("U123") # bound to user_id
 
 conversations = slack.conversations()
-general = slack.conversations("C123")
+conversations = slack.conversations("C123") # bound to channel_id
+
+files = slack.files("F123") # bound to file_id
+
+msgs = slack.messages(channel_id="C123", ts="...")  # bound to message
+
+ws = slack.workspaces("T123")   # bound to workspace_id
+
+idp = slack.idp_groups("S123")  # bound to group_id
 ```
 
 This avoids global state while keeping usage concise and consistent.
@@ -113,13 +127,13 @@ pip install slack-objects
 ## Configuration
 
 ```python
-from slack_objects.config import SlackObjectsConfig, RateTier
+from slack_objects import SlackObjectsClient, SlackObjectsConfig, RateTier
 
 cfg = SlackObjectsConfig(
     bot_token="xoxb-...",
     user_token="xoxp-...",
     scim_token="xoxp-...",
-    default_rate_tier=RateTier.TIER_3,
+    default_rate_tier=RateTier.TIER_3,  # fallback sleep between API calls when no specific tier matches
 )
 ```
 
@@ -138,5 +152,5 @@ python -m tests.run_all_smoke
 ## Notes
 
 - SCIM v2 is the default; v1 is supported where applicable
-- `PC_Utils` is a required dependency (used for datetime handling, e.g., guest expiration dates)
+- `PC_Utils` is an optional dependency (used for datetime handling in `set_guest_expiration_date`)
 - This package is intended for automation and administration workflows
