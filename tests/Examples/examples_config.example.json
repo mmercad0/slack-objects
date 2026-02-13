@@ -1,0 +1,6 @@
+{
+  "_comment": "Copy this file to examples_config.json and fill in your values. The real file is git-ignored.",
+  "keyvault_name": "Your-Azure-KeyVault-Name",
+  "bot_token_secret": "Your-Bot-Token-Secret",
+  "user_token_secret": "Your-User-Token-Secret"
+}
