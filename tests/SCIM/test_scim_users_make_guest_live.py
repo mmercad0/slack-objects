@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import time
 from typing import Optional
+import warnings
 
 import pytest
 import requests
@@ -124,6 +125,11 @@ class TestMakeMultiChannelGuest:
         """Attempting to make an admin a MCG — expect error or policy rejection."""
         try:
             resp = users.make_multi_channel_guest(ctx.active_admin_id)
+            warnings.warn(
+                f"Slack allowed admin→MCG conversion — user {ctx.active_admin_id} "
+                f"has been demoted. Restore with admin.users.setAdmin.",
+                stacklevel=1,
+            )
         except requests.HTTPError as exc:
             assert exc.response.status_code in (400, 403), (
                 f"Unexpected status for admin→MCG: {exc.response.status_code}"
@@ -136,6 +142,11 @@ class TestMakeMultiChannelGuest:
         """Attempting to make an owner a MCG — expect error or policy rejection."""
         try:
             resp = users.make_multi_channel_guest(ctx.active_owner_id)
+            warnings.warn(
+                f"Slack allowed owner→MCG conversion — user {ctx.active_owner_id} "
+                f"has been demoted. Restore with admin.users.setOwner.",
+                stacklevel=1,
+            )
         except requests.HTTPError as exc:
             assert exc.response.status_code in (400, 403), (
                 f"Unexpected status for owner→MCG: {exc.response.status_code}"
@@ -148,6 +159,11 @@ class TestMakeMultiChannelGuest:
         """Attempting to make a deactivated user a MCG."""
         try:
             resp = users.make_multi_channel_guest(ctx.deactivated_user_id)
+            warnings.warn(
+                f"Slack allowed deactivated→MCG conversion — user {ctx.deactivated_user_id} "
+                f"is now active as MCG. Re-deactivate with scim_deactivate_user.",
+                stacklevel=1,
+            )
         except requests.HTTPError as exc:
             assert exc.response.status_code in (400, 403, 404)
         _pause()
