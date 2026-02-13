@@ -25,6 +25,7 @@ import json
 import logging
 
 import requests
+from slack_objects.rate_limits import RateLimitPolicy
 
 
 # -----------------------------
@@ -161,6 +162,9 @@ def test_get_groups_paginates_and_shapes_output():
     # Instantiate IDP_groups in package style (cfg/client/logger/api).
     idp = IDP_groups(cfg=cfg, client=DummySlackClient(), logger=logging.getLogger("test"), api=DummyApiCaller(), scim_session=sess)
 
+    # After creating the IDP_groups instance in each test, add:
+    idp.rate_policy = RateLimitPolicy(method_overrides={}, prefix_rules={}, default=0.0)
+
     # Monkey-patch the session routes after first call to simulate pagination.
     # (Keeps the fake simple, but still tests your pagination loop.)
     call_count = []
@@ -210,7 +214,9 @@ def test_get_members_and_is_member_with_bound_group():
     sess = FakeScimSession(routes)
 
     idp = IDP_groups(cfg=cfg, client=DummySlackClient(), logger=logging.getLogger("test"), api=DummyApiCaller(), scim_session=sess)
+    idp.rate_policy = RateLimitPolicy(method_overrides={}, prefix_rules={}, default=0.0)
     bound = idp.with_group("S123")
+    bound.rate_policy = RateLimitPolicy(method_overrides={}, prefix_rules={}, default=0.0)
 
     members = bound.get_members()
     assert members == group_payload["members"]
@@ -253,10 +259,12 @@ def test_factory_style_if_available():
         raise AssertionError("slack.idp_groups() did not return an IDP_groups instance")
 
     idp.scim_session = sess
+    idp.rate_policy = RateLimitPolicy(method_overrides={}, prefix_rules={}, default=0.0)
 
     bound = slack.idp_groups("S123")
     # Make sure the bound instance shares the session (since with_group copies it)
     bound.scim_session = sess
+    bound.rate_policy = RateLimitPolicy(method_overrides={}, prefix_rules={}, default=0.0)
 
     assert bound.is_member("U1") is True
 
