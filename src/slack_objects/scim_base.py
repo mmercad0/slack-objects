@@ -15,7 +15,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-import requests     # requests is used — self.scim_session is a requests.Session and resp.raise_for_status() raises requests.HTTPError. The docstring documents this.
+import requests  # used by self.scim_session (requests.Session) and resp.raise_for_status()
 
 from .config import RateTier
 

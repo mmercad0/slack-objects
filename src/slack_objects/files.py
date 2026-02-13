@@ -1,4 +1,3 @@
-# src/slack_objects/files.py
 from __future__ import annotations
 
 """
