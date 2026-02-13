@@ -5,7 +5,7 @@ import logging
 from slack_objects.config import SlackObjectsConfig, RateTier
 from slack_objects.conversations import Conversations
 
-from tests._smoke_harness import FakeWebClient, FakeApiCaller, CallSpec, run_smoke
+from tests.Smoke._smoke_harness import FakeWebClient, FakeApiCaller, CallSpec, run_smoke
 
 
 def main() -> None:

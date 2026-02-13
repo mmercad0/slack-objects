@@ -14,7 +14,7 @@ import logging
 from slack_objects.scim_base import validate_scim_id
 from slack_objects.base import safe_error_context
 
-from tests._smoke_harness import CallSpec, run_smoke
+from tests.Smoke._smoke_harness import CallSpec, run_smoke
 
 
 # ---------- validate_scim_id ----------

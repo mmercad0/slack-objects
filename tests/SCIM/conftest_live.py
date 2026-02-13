@@ -45,7 +45,7 @@ from slack_objects import SlackObjectsClient, SlackObjectsConfig
 # Constants
 # ---------------------------------------------------------------------------
 _HERE = Path(__file__).resolve().parent
-_DEFAULT_CONFIG_PATH = _HERE / "live_test_config.json"
+_DEFAULT_CONFIG_PATH = _HERE.parent / "live_test_config.json"
 
 # Azure Key Vault
 _KEYVAULT_NAME = "Slack-AI-assistant-KV"

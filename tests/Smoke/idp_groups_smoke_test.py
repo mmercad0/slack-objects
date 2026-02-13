@@ -5,7 +5,7 @@ import logging
 from slack_objects.config import SlackObjectsConfig, RateTier
 from slack_objects.idp_groups import IDP_groups
 
-from tests._smoke_harness import (
+from tests.Smoke._smoke_harness import (
     FakeWebClient,
     FakeApiCaller,
     FakeScimSession,

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from slack_objects.config import SlackObjectsConfig, RateTier
 from slack_objects.users import Users
 
-from tests._smoke_harness import (
+from tests.Smoke._smoke_harness import (
     FakeWebClient,
     FakeApiCaller,
     FakeScimSession,
@@ -47,7 +47,7 @@ def _force_idp_groups_to_use_fake_scim_session() -> None:
     hold the original callable.
     """
     import slack_objects.idp_groups as idp_mod
-    from tests._smoke_harness import FakeScimSession
+    from tests.Smoke._smoke_harness import FakeScimSession
 
     original_init = idp_mod.IDP_groups.__init__
 

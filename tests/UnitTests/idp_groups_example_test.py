@@ -35,6 +35,7 @@ class FakeResponse:
     """Minimal requests.Response-like object for our fake session."""
     def __init__(self, status_code: int, payload: Dict[str, Any]):
         self.status_code = status_code
+        self.ok = 200 <= status_code < 300
         self._payload = payload
         self.text = json.dumps(payload)
 
@@ -42,7 +43,7 @@ class FakeResponse:
         return self._payload
 
     def raise_for_status(self) -> None:
-        if not (200 <= self.status_code < 300):
+        if not self.ok:
             raise requests.HTTPError(f"HTTP {self.status_code}: {self.text}")
 
 
@@ -94,9 +95,16 @@ class DummyConfig:
     scim_token: str = "xoxp-scim-token"
     http_timeout_seconds: int = 5
 
-    # Optional overrides (leave None to use default Slack SCIM URLs)
-    scim_base_url_v1: Optional[str] = None
-    scim_base_url_v2: Optional[str] = None
+    # Required by SlackObjectBase.__post_init__ → rate_policy resolution
+    default_rate_tier: float = 3.0  # RateTier.TIER_2 value
+
+    # Required by ScimMixin._scim_base_url()
+    scim_base_url: str = "https://api.slack.com/scim"
+    scim_version: str = "v1"
+
+    # Required by SlackObjectsClient.__init__
+    bot_token: Optional[str] = "xoxb-dummy-bot-token"
+    user_token: Optional[str] = None
 
 
 # -----------------------------
@@ -104,11 +112,7 @@ class DummyConfig:
 # -----------------------------
 
 def _scim_base(cfg: DummyConfig, version: str = "v1") -> str:
-    if version == "v2" and cfg.scim_base_url_v2:
-        return cfg.scim_base_url_v2.rstrip("/") + "/"
-    if version == "v1" and cfg.scim_base_url_v1:
-        return cfg.scim_base_url_v1.rstrip("/") + "/"
-    return f"https://api.slack.com/scim/{version}/"
+    return f"{cfg.scim_base_url.rstrip('/')}/{cfg.scim_version}/"
 
 
 # -----------------------------
@@ -159,15 +163,17 @@ def test_get_groups_paginates_and_shapes_output():
 
     # Monkey-patch the session routes after first call to simulate pagination.
     # (Keeps the fake simple, but still tests your pagination loop.)
+    call_count = []
     def request_side_effect(method: str, url: str, **kwargs):
+        call_count.append(1)
         # first GET Groups -> page1, second -> page2
-        if len(sess.calls) == 0:
+        if len(call_count) == 1:
             return FakeResponse(200, page1)
         return FakeResponse(200, page2)
 
     sess.request = request_side_effect  # type: ignore[method-assign]
 
-    groups = idp.get_groups(scim_version="v1", fetch_count=2)
+    groups = idp.get_groups(fetch_count=2)
 
     assert groups == [
         {"group id": "S111", "group name": "Admins"},

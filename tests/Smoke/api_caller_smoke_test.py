@@ -18,7 +18,7 @@ from typing import Any, Dict, Optional
 from slack_objects.config import SlackObjectsConfig, RateTier
 from slack_objects.api_caller import SlackApiCaller
 
-from tests._smoke_harness import CallSpec, run_smoke
+from tests.Smoke._smoke_harness import CallSpec, run_smoke
 
 
 # ---------------------------------------------------------------------------
