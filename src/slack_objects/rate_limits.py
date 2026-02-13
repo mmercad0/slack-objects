@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Mapping
+from typing import Mapping
 
 from .config import RateTier
 
