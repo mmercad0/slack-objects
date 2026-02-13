@@ -1,20 +1,41 @@
 {
-    "team_id":                "T0123456789",
-    "channel_id":             "C0123456789",
-    "idp_group_id":           "",
+  "team_id": "T0123456789",
+  "channel_id": "C0123456789",
 
-    "active_member_id":       "U0123456789",
-    "active_member_email":    "member@example.com",
+  "idp_group_id": "",
+  "_idp_group_note": "e.g., name of the IdP group",
 
-    "active_admin_id":        "U0123456789",
-    "active_owner_id":        "U0123456789",
+  "active_member_id": "U0123456789",
+  "active_member_email": "member@example.com",
+  "_active_member_note": "e.g., name of member | workspace(s) | etc.",
 
-    "deactivated_user_id":    "U0123456789",
-    "deactivated_user_email": "deactivated@example.com",
 
-    "single_channel_guest_id":"U0123456789",
-    "multi_channel_guest_id": "U0123456789",
+  "active_admin_id": "U0123456789",
+  "_active_admin_note": "",
 
-    "nonexistent_user_id":    "UXXXXXXXXXX",
-    "nonexistent_email":      "nobody@example.com"
+  "active_owner_id": "U0123456789",
+  "_active_owner_note": "",
+
+  "deactivated_user_id": "U0123456789",
+  "deactivated_user_email": "deactivated@example.com",
+  "_deactivated_user_note": "",
+
+  "single_channel_guest_id": "U0123456789",
+  "_single_channel_guest_note": "",
+
+  "multi_channel_guest_id": "U0123456789",
+  "_multi_channel_guest_note": "",
+
+  "nonexistent_user_id": "UXXXXXXXXXX",
+  "nonexistent_email": "nobody@example.com",
+
+  "_disposable_users_note": "Users below are expendable — tests may permanently change their type/state. Create via SCIM or use test-only accounts.",
+
+  "disposable_member_id": "",
+  "disposable_member_email": "",
+  "_disposable_member_note": "",
+
+  "disposable_guest_id": "",
+  "disposable_guest_email": "",
+  "_disposable_guest_note": ""
 }
