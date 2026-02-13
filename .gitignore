@@ -27,3 +27,6 @@ src/slack_objects/_version.py
 /tests/Users/__pycache__
 /tests/UnitTests/__pycache__
 /tests/Examples/__pycache__
+
+# Examples config (contains Key Vault / secret names)
+/tests/Examples/examples_config.json
