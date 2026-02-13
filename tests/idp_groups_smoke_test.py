@@ -36,14 +36,7 @@ def main() -> None:
         scim_session=FakeScimSession(),
     )
 
-    bound = IDP_groups(
-        cfg=cfg,
-        client=client,
-        api=api,
-        logger=logger,
-        group_id="G1",
-        scim_session=FakeScimSession(),
-    )
+    bound = idp.with_group("G1")
 
     specs = [
         # Factory helper
