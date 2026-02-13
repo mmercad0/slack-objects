@@ -25,7 +25,7 @@ This module provides file-centric behaviors:
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Sequence, Union, List
+from typing import Any, Dict, Optional, Union
 
 import requests
 

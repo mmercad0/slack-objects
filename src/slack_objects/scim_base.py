@@ -10,13 +10,12 @@ Centralizes:
 
 from __future__ import annotations
 
-import json
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-import requests
+import requests     # requests is used — self.scim_session is a requests.Session and resp.raise_for_status() raises requests.HTTPError. The docstring documents this.
 
 from .config import RateTier
 
@@ -31,7 +30,7 @@ def validate_scim_id(value: str, label: str = "id") -> str:
     return value
 
 
-@dataclass
+@dataclass(frozen=True)
 class ScimResponse:
     """Structured result for SCIM calls (no Slack 'ok' boolean)."""
     ok: bool
@@ -45,8 +44,9 @@ class ScimMixin:
     Mixin providing SCIM REST helpers.
 
     Requirements on the host class (satisfied by SlackObjectBase subclasses):
-        - self.cfg   (SlackObjectsConfig)
-        - self.scim_session  (requests.Session)
+        - self.cfg            (SlackObjectsConfig)
+        - self.scim_session   (requests.Session)
+        - self.rate_policy    (RateLimitPolicy)
     """
 
     # --- URL ---
@@ -65,9 +65,14 @@ class ScimMixin:
         token: Optional[str] = None,
         params: Optional[Dict[str, Any]] = None,
         raise_for_status: bool = True,
+        rate_tier: Optional[RateTier] = None,
     ) -> ScimResponse:
         """
         Perform a SCIM REST request and return a ScimResponse.
+
+        Rate limiting uses *rate_tier* if given, otherwise resolves via
+        ``self.rate_policy`` using a ``scim.<path_root>`` method key
+        (e.g. ``scim.Users``, ``scim.Groups``).
 
         Raises ValueError when the token is missing.
         Raises requests.HTTPError on non-2xx when raise_for_status is True.
@@ -105,5 +110,8 @@ class ScimMixin:
 
         ok = resp.ok and (data.get("Errors") is None)
 
-        time.sleep(float(RateTier.TIER_2))
+        # Resolve rate tier: explicit override → policy lookup → TIER_2 fallback
+        path_root = path.lstrip("/").split("/")[0]          # "Users/U123" → "Users"
+        tier = rate_tier or self.rate_policy.tier_for(f"scim.{path_root}")
+        time.sleep(float(tier))
         return ScimResponse(ok=ok, status_code=resp.status_code, data=data, text=text)

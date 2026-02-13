@@ -23,8 +23,8 @@ Design goals:
     Provide common message operations: update/delete, thread replies, and block replacement.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from .base import SlackObjectBase
 from .config import RateTier

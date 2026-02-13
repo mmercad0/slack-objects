@@ -30,7 +30,7 @@ Design goals:
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional
 
 
 from .base import SlackObjectBase, safe_error_context
