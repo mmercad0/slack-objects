@@ -31,20 +31,19 @@ class SlackObjectsClient:
         self.api = SlackApiCaller(cfg)
 
     def users(self, user_id: Optional[str] = None) -> Users:
-        base = Users(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger)
-        return base if user_id is None else base.with_user(user_id)
+        return Users(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger, user_id=user_id)
 
-    def conversations(self) -> Conversations:
-        return Conversations(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger)
+    def conversations(self, channel_id: Optional[str] = None) -> Conversations:
+        return Conversations(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger, channel_id=channel_id)
 
-    def files(self) -> Files:
-        return Files(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger)
+    def files(self, file_id: Optional[str] = None) -> Files:
+        return Files(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger, file_id=file_id)
 
-    def messages(self) -> Messages:
-        return Messages(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger)
+    def messages(self, channel_id: Optional[str] = None, ts: Optional[str] = None) -> Messages:
+        return Messages(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger, channel_id=channel_id, ts=ts)
 
-    def workspaces(self) -> Workspaces:
-        return Workspaces(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger)
+    def workspaces(self, workspace_id: Optional[str] = None) -> Workspaces:
+        return Workspaces(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger, workspace_id=workspace_id)
 
-    def idp_groups(self) -> IDP_groups:
-        return IDP_groups(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger)
+    def idp_groups(self, group_id: Optional[str] = None) -> IDP_groups:
+        return IDP_groups(cfg=self.cfg, client=self.web_client, api=self.api, logger=self.logger, group_id=group_id)
