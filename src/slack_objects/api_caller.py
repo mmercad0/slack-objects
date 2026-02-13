@@ -19,7 +19,7 @@ class SlackApiCaller:
 
     def call(self, client, method: str, *, rate_tier: Optional[RateTier] = None, use_json: bool = False, _retry_count: int = 0, **kwargs) -> dict:
         MAX_RETRIES = 5
-        tier = rate_tier or self.policy.tier_for(method) or self.cfg.default_rate_tier
+        tier = rate_tier or self.policy.tier_for(method)
 
         try:
             if use_json:
