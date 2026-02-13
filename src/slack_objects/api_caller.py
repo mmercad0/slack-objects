@@ -1,5 +1,5 @@
 import time
-from typing import Any, Optional
+from typing import Optional
 
 from slack_sdk.errors import SlackApiError
 
@@ -15,7 +15,8 @@ class SlackApiCaller:
     """
     def __init__(self, cfg: SlackObjectsConfig, policy: RateLimitPolicy = DEFAULT_RATE_POLICY):
         self.cfg = cfg
-        self.policy = policy
+        # Respect cfg.default_rate_tier as the policy's fallback tier
+        self.policy = policy.with_default(cfg.default_rate_tier)
 
     def call(self, client, method: str, *, rate_tier: Optional[RateTier] = None, use_json: bool = False, _retry_count: int = 0, **kwargs) -> dict:
         MAX_RETRIES = 5

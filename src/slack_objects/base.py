@@ -1,10 +1,11 @@
 import logging
 from dataclasses import dataclass, field
-from typing import Optional, Any
+from typing import Any
 from slack_sdk import WebClient
 
 from .api_caller import SlackApiCaller
 from .config import SlackObjectsConfig
+from .rate_limits import DEFAULT_RATE_POLICY, RateLimitPolicy
 
 
 # Keys that are safe to include in error messages (never contain tokens)
@@ -38,6 +39,7 @@ class SlackObjectBase:
     client: WebClient
     api: SlackApiCaller
     logger: logging.Logger = field(default_factory=lambda: logging.getLogger("slack-objects"))  # logger is guaranteed to exist via default_factory
+    rate_policy: RateLimitPolicy = field(default=None)
 
     def __post_init__(self) -> None:
         # Required dependencies check
@@ -47,3 +49,6 @@ class SlackObjectBase:
             raise ValueError("client is required")
         if self.api is None:
             raise ValueError("api is required")
+        # Default rate_policy respects cfg.default_rate_tier as the fallback
+        if self.rate_policy is None:
+            self.rate_policy = DEFAULT_RATE_POLICY.with_default(self.cfg.default_rate_tier)

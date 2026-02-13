@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Mapping
 
 from .config import RateTier
@@ -14,6 +14,10 @@ class RateLimitPolicy:
 
     # fallback
     default: RateTier = RateTier.TIER_3
+
+    def with_default(self, tier: RateTier) -> "RateLimitPolicy":
+        """Return a copy of this policy with a different fallback tier."""
+        return replace(self, default=tier)
 
     def tier_for(self, method: str) -> RateTier:
         # 1) exact match wins
