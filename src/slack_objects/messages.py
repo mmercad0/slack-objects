@@ -16,7 +16,7 @@ Design goals:
     slack = SlackObjectsClient(cfg)
     msgs = slack.messages()                      # unbound
     msgs_c = slack.messages(channel_id="C123")   # bound to channel
-    msg = slack.messages("C123", "1700.12")      # bound to message
+    msg = slack.messages(channel_id="C123", ts="1700.12")   # bound to message
 - Modular:
     Only endpoint wrapper methods call self.api.call(...)
 - Practical:

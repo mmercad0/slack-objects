@@ -38,7 +38,7 @@ class Users(ScimMixin, SlackObjectBase):
     Notes:
     - `user_id` is optional. If you call methods that need a user, they will require a bound
       user_id or a passed user_id.
-    - `attributes` are cached after `refresh()`; many helpers read from this cache.
+    - `attributes` are loaded lazily via `_require_attributes()` on first access; many helpers read from this cache.
     """
     user_id: Optional[str] = None
     attributes: Dict[str, Any] = field(default_factory=dict)
