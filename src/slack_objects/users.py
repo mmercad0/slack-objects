@@ -178,7 +178,7 @@ class Users(ScimMixin, SlackObjectBase):
 
     def _discovery_user_conversations(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Wrapper for discovery.user.conversations."""
-        return self.api.call(self.client, "discovery.user.conversations", rate_tier=RateTier.TIER_3, **payload)
+        return self.api.call(self.client, "discovery.user.conversations", rate_tier=RateTier.TIER_D, **payload)
 
     # ============================================================
     # Public Slack Web/Admin methods (call wrappers above)

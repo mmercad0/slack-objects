@@ -13,6 +13,7 @@ class RateTier(float, Enum):
 	TIER_2 = 3.0	# 20+ per minute
 	TIER_3 = 1.2	# 50+ per minute
 	TIER_4 = 0.6	# 100+ per minute
+	TIER_D = 0.05	# 1200+ per minute
 
 
 @dataclass(frozen=True)
