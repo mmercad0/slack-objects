@@ -21,9 +21,8 @@ from typing import Any, Dict, Optional, Sequence, Union, List
 import requests
 
 from .base import SlackObjectBase, safe_error_context
-from .config import RateTier
+from .config import RateTier, USER_ID_RE
 from .scim_base import ScimMixin, ScimResponse, validate_scim_id
-
 
 @dataclass
 class Users(ScimMixin, SlackObjectBase):
@@ -397,6 +396,119 @@ class Users(ScimMixin, SlackObjectBase):
     # ============================================================
     # SCIM public methods (use inherited ScimMixin._scim_request)
     # ============================================================
+
+    # ---------- SCIM search primitives ----------
+
+    def scim_search_user_by_email(self, email: str) -> ScimResponse:
+        """
+        SCIM GET Users with filter: emails.value eq "<email>".
+
+        Returns active AND deactivated users — unlike the Web API's
+        users.lookupByEmail which only returns active users.
+        """
+        return self._scim_request(
+            path="Users",
+            method="GET",
+            params={"filter": f'emails.value eq "{email}"'},
+        )
+
+    def scim_search_user_by_username(self, username: str) -> ScimResponse:
+        """
+        SCIM GET Users with filter: userName eq "<username>".
+
+        Returns active AND deactivated users.
+        """
+        return self._scim_request(
+            path="Users",
+            method="GET",
+            params={"filter": f'userName eq "{username}"'},
+        )
+
+    # ---------- identifier resolution ----------
+
+    @staticmethod
+    def _looks_like_user_id(value: str) -> bool:
+        """Return True if *value* matches the Slack user/bot ID pattern (U… or W…)."""
+        return bool(USER_ID_RE.match(value))
+
+    @staticmethod
+    def _first_scim_user_id(scim_resp: ScimResponse) -> str:
+        """
+        Extract the user ID from the first resource in a SCIM list response.
+
+        Returns ``""`` when no resources are present.
+        """
+        resources = scim_resp.data.get("Resources") or []
+        if resources:
+            return resources[0].get("id", "")
+        return ""
+
+    def resolve_user_id(self, identifier: str) -> str:
+        """
+        Resolve a flexible user identifier to a Slack user ID.
+
+        Accepts any of:
+        - A Slack user ID (e.g. ``"U01ABC123"``)
+        - An email address (e.g. ``"alice@example.com"``)
+        - A ``@username`` handle (e.g. ``"@alice"``)
+
+        Resolution strategy:
+        1. If the identifier matches the Slack user ID pattern (``^[UW][A-Z0-9]+$``),
+           return it as-is.
+        2. If it contains ``@`` and looks like an email, try the Web API
+           ``users.lookupByEmail`` first (fast, but only finds active users).
+           On miss, fall back to SCIM email filter search.
+        3. If it starts with ``@``, strip the prefix and search SCIM by ``userName``.
+        4. Otherwise treat it as a bare username and search SCIM.
+
+        Returns:
+            The Slack user ID string.
+
+        Raises:
+            LookupError: when no matching user can be found via any strategy.
+            ValueError: when *identifier* is empty.
+        """
+        if not identifier or not identifier.strip():
+            raise ValueError("identifier must not be empty")
+
+        identifier = identifier.strip()
+
+        # ── 1. Slack user ID ──────────────────────────────────────
+        if self._looks_like_user_id(identifier):
+            return identifier
+
+        # ── 2. Email address ──────────────────────────────────────
+        if "@" in identifier and not identifier.startswith("@"):
+            # Fast path: Web API (active users only)
+            uid = self.get_user_id_from_email(identifier)
+            if uid:
+                return uid
+
+            # Slow path: SCIM (active + deactivated)
+            self.logger.info("Web API miss for %s — falling back to SCIM search", identifier)
+            uid = self._first_scim_user_id(self.scim_search_user_by_email(identifier))
+            if uid:
+                return uid
+
+            raise LookupError(f"No user found for email: {identifier}")
+
+        # ── 3. @username handle ───────────────────────────────────
+        if identifier.startswith("@"):
+            username = identifier.lstrip("@")
+            uid = self._first_scim_user_id(self.scim_search_user_by_username(username))
+            if uid:
+                return uid
+
+            raise LookupError(f"No user found for username: @{username}")
+
+        # ── 4. Bare string — try as username via SCIM ─────────────
+        uid = self._first_scim_user_id(self.scim_search_user_by_username(identifier))
+        if uid:
+            return uid
+
+        raise LookupError(f"No user found for identifier: {identifier}")
+
+    # ---------- SCIM CRUD ----------
 
     def scim_create_user(self, username: str, email: str) -> ScimResponse:
         """SCIM POST Users"""

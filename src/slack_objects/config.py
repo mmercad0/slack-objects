@@ -1,6 +1,10 @@
+import re
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import Optional
+
+# Slack user/bot IDs: U or W followed by uppercase alphanumeric characters.
+USER_ID_RE = re.compile(r"^[UW][A-Z0-9]+$")
 
 
 class RateTier(float, Enum):

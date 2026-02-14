@@ -131,3 +131,23 @@ class TestRequireAttributes:
         """Unbound, no user_id, no attrs should raise ValueError."""
         with pytest.raises(ValueError, match="not loaded"):
             users._require_attributes()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# resolve_user_id — input validation
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestResolveUserIdValidation:
+    """resolve_user_id should reject empty/blank identifiers locally."""
+
+    def test_empty_raises(self, users):
+        with pytest.raises(ValueError, match="must not be empty"):
+            users.resolve_user_id("")
+
+    def test_whitespace_raises(self, users):
+        with pytest.raises(ValueError, match="must not be empty"):
+            users.resolve_user_id("   ")
+
+    def test_user_id_passthrough(self, ctx, users):
+        """Known user ID should be returned as-is without an API call."""
+        assert users.resolve_user_id(ctx.active_member_id) == ctx.active_member_id
