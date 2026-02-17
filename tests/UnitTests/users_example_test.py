@@ -165,11 +165,18 @@ class TestFirstScimUserId:
 class TestResolveUserId:
     """resolve_user_id — identifier classification and fallback logic."""
 
-    def test_user_id_passthrough(self):
-        """User IDs are returned as-is without any API calls."""
+    def test_user_id_verified(self):
+        """User IDs are verified via users.info before returning."""
         users = _make_users()
         assert users.resolve_user_id("U01ABC123") == "U01ABC123"
         assert users.resolve_user_id("W0ABC") == "W0ABC"
+
+    def test_user_id_not_found_raises(self):
+        """Non-existent user ID raises LookupError."""
+        users = _make_users()
+        users.get_user_info = MagicMock(return_value={"ok": False, "error": "user_not_found"})
+        with pytest.raises(LookupError, match="No user found for user ID"):
+            users.resolve_user_id("U00GHOST")
 
     def test_email_active_user(self):
         """Active user email resolves via Web API (fast path)."""
