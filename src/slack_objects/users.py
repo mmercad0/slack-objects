@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Sequence, Union, List
 
 import requests
+from slack_sdk.errors import SlackApiError
 
 from .base import SlackObjectBase, safe_error_context
 from .config import RateTier, USER_ID_RE
@@ -457,7 +458,7 @@ class Users(ScimMixin, SlackObjectBase):
            return it as-is.
         2. If it contains ``@`` and looks like an email, try the Web API
            ``users.lookupByEmail`` first (fast, but only finds active users).
-           On miss, fall back to SCIM email filter search.
+           On miss or SlackApiError, fall back to SCIM email filter search.
         3. If it starts with ``@``, strip the prefix and search SCIM by ``userName``.
         4. Otherwise treat it as a bare username and search SCIM.
 
@@ -480,9 +481,12 @@ class Users(ScimMixin, SlackObjectBase):
         # ── 2. Email address ──────────────────────────────────────
         if "@" in identifier and not identifier.startswith("@"):
             # Fast path: Web API (active users only)
-            uid = self.get_user_id_from_email(identifier)
-            if uid:
-                return uid
+            try:
+                uid = self.get_user_id_from_email(identifier)
+                if uid:
+                    return uid
+            except SlackApiError:
+                pass  # expected for deactivated / not-found users
 
             # Slow path: SCIM (active + deactivated)
             self.logger.info("Web API miss for %s — falling back to SCIM search", identifier)
