@@ -6,6 +6,9 @@ from typing import Optional
 # Slack user/bot IDs: U or W followed by uppercase alphanumeric characters.
 USER_ID_RE = re.compile(r"^[UW][A-Z0-9]+$")
 
+# Lightweight email pattern (not RFC 5322, but catches obvious non-emails).
+EMAIL_RE = re.compile(r"^[\w.\-]+@[\w.\-]+\.\w+$")
+
 
 class RateTier(float, Enum):
 	"""

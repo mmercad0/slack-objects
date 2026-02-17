@@ -22,7 +22,7 @@ import requests
 from slack_sdk.errors import SlackApiError
 
 from .base import SlackObjectBase, safe_error_context
-from .config import RateTier, USER_ID_RE
+from .config import RateTier, USER_ID_RE, EMAIL_RE
 from .scim_base import ScimMixin, ScimResponse, validate_scim_id
 
 @dataclass
@@ -450,24 +450,17 @@ class Users(ScimMixin, SlackObjectBase):
 
     def resolve_user_id(self, identifier: str) -> str:
         """
-        Resolve a flexible user identifier to a Slack user ID.
+        Resolve a flexible user identifier to a **verified** Slack user ID.
 
         Accepts any of:
         - A Slack user ID (e.g. ``"U01ABC123"``)
         - An email address (e.g. ``"alice@example.com"``)
         - A ``@username`` handle (e.g. ``"@alice"``)
 
-        Resolution strategy:
-        1. If the identifier matches the Slack user ID pattern (``^[UW][A-Z0-9]+$``),
-           return it as-is.
-        2. If it contains ``@`` and looks like an email, try the Web API
-           ``users.lookupByEmail`` first (fast, but only finds active users).
-           On miss or SlackApiError, fall back to SCIM email filter search.
-        3. If it starts with ``@``, strip the prefix and search SCIM by ``userName``.
-        4. Otherwise treat it as a bare username and search SCIM.
+        Every code path verifies the user exists in Slack before returning.
 
         Returns:
-            The Slack user ID string.
+            The Slack user ID string (confirmed to exist).
 
         Raises:
             LookupError: when no matching user can be found via any strategy.
@@ -480,10 +473,13 @@ class Users(ScimMixin, SlackObjectBase):
 
         # ── 1. Slack user ID ──────────────────────────────────────
         if self._looks_like_user_id(identifier):
-            return identifier
+            resp = self.get_user_info(identifier)
+            if resp.get("ok"):
+                return identifier
+            raise LookupError(f"No user found for user ID: {identifier}")
 
         # ── 2. Email address ──────────────────────────────────────
-        if "@" in identifier and not identifier.startswith("@"):
+        if EMAIL_RE.match(identifier):
             # Fast path: Web API (active users only)
             try:
                 uid = self.get_user_id_from_email(identifier)
