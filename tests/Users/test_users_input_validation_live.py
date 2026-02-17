@@ -134,7 +134,7 @@ class TestRequireAttributes:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# resolve_user_id — input validation
+# resolve_user_id — input validation (no API calls for these)
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestResolveUserIdValidation:
@@ -149,5 +149,5 @@ class TestResolveUserIdValidation:
             users.resolve_user_id("   ")
 
     def test_user_id_passthrough(self, ctx, users):
-        """Known user ID should be returned as-is without an API call."""
+        """Known user ID is returned as-is without an API call."""
         assert users.resolve_user_id(ctx.active_member_id) == ctx.active_member_id
