@@ -47,24 +47,16 @@ email = input("Enter the email address to search: ")
 
 # ── Approach 1: Web API (active users only) ───────────────────────────────
 print("\n--- Web API: users.lookupByEmail ---")
-try:
-    user_id = users.get_user_id_from_email(email)
-    if user_id:
-        print(f"Found active user: {user_id}")
-    else:
-        print("No active user found with that email.")
-except Exception as e:
-    print(f"Error: {e}")
+user_id = users.get_user_id_from_email(email)
+if user_id:
+    print(f"Found active user: {user_id}")
+else:
+    print("No active user found with that email.")
 
 # ── Approach 2: SCIM API (active AND deactivated users) ───────────────────
 print("\n--- SCIM API: GET /Users?filter=emails.value eq ... ---")
 try:
-    scim_resp = users._scim_request(
-        path="Users",
-        method="GET",
-        params={"filter": f'emails.value eq "{email}"'},
-        raise_for_status=True,
-    )
+    scim_resp = users.scim_search_user_by_email(email)
 
     resources = scim_resp.data.get("Resources", [])
     if not resources:
@@ -80,3 +72,11 @@ try:
             print()
 except Exception as e:
     print(f"SCIM error: {e}")
+
+# ── Approach 3: resolve_user_id (Web API → SCIM fallback) ────────────────
+print("\n--- resolve_user_id (automatic fallback) ---")
+try:
+    resolved_id = users.resolve_user_id(email)
+    print(f"Resolved user ID: {resolved_id}")
+except LookupError:
+    print("No user found with that email (active or deactivated).")

@@ -196,11 +196,15 @@ class Users(ScimMixin, SlackObjectBase):
         """
         Convenience wrapper that returns only the Slack user ID for an email.
 
-        Legacy behavior returned '' on miss; keep that for compatibility.
+        Returns ``""`` on miss (deactivated, not found, or API error) for
+        backward compatibility.
         """
-        resp = self.lookup_by_email(email)
-        if resp.get("ok"):
-            return (resp.get("user") or {}).get("id", "") or ""
+        try:
+            resp = self.lookup_by_email(email)
+            if resp.get("ok"):
+                return (resp.get("user") or {}).get("id", "") or ""
+        except SlackApiError:
+            pass  # users_not_found for deactivated / non-existent users
         return ""
 
     def get_user_profile(self, user_id: Optional[str] = None) -> Dict[str, Any]:
