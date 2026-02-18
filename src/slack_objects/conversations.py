@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .base import SlackObjectBase, safe_error_context
-from .config import RateTier
+from .config import RateTier, CONVERSATION_ID_RE
 from .messages import Messages
 
 @dataclass
@@ -434,3 +434,8 @@ class Conversations(SlackObjectBase):
             oldest=oldest,
             inclusive=inclusive,
         )
+
+    @staticmethod
+    def _looks_like_channel_id(value: str) -> bool:
+        """Return True if *value* matches the Slack conversation ID pattern (C…, G…, or D…)."""
+        return bool(CONVERSATION_ID_RE.match(value))
