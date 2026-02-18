@@ -257,6 +257,13 @@ class Users(ScimMixin, SlackObjectBase):
         if not self.user_id:
             raise ValueError("is_user_authorized requires a bound user_id")
 
+        # Short-circuit: deactivated users cannot be authorized.
+        # Uses cached attributes when available (zero extra calls);
+        # otherwise costs one Tier-4 users.info call — still cheaper
+        # than the SCIM group-membership lookups that follow.
+        if not self.is_active():
+            return False
+
         # Resolve policy
         if auth_level == "write":
             group_ids = getattr(self.cfg, "auth_idp_groups_write_access", {}).get(service_name, [])
