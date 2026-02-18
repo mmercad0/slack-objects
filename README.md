@@ -154,3 +154,5 @@ python -m tests.run_all_smoke
 - SCIM v2 is the default; v1 is supported where applicable
 - `PC_Utils` is an optional dependency (used for datetime handling in `set_guest_expiration_date`)
 - This package is intended for automation and administration workflows
+- `resolve_user_id` accepts flexible identifiers (user ID, email, or @username) and verifies existence via Web API + SCIM fallback
+- `is_user_authorized` supports IdP-group-based authorization checks with configurable read/write access levels

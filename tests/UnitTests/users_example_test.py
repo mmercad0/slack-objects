@@ -238,3 +238,71 @@ class TestResolveUserId:
         users = _make_users()
         with pytest.raises(ValueError, match="must not be empty"):
             users.resolve_user_id("   ")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# is_user_authorized
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestIsUserAuthorized:
+    """is_user_authorized — IdP group-based authorization checks."""
+
+    @staticmethod
+    def _make_users_with_auth(*, read_access=None, write_access=None):
+        """Build a Users instance with auth policy baked into the frozen config."""
+        cfg = SlackObjectsConfig(
+            bot_token="xoxb-fake",
+            user_token="xoxp-fake",
+            scim_token="xoxp-fake",
+            default_rate_tier=RateTier.TIER_3,
+            auth_idp_groups_read_access=read_access or {},
+            auth_idp_groups_write_access=write_access or {},
+        )
+        slack = SlackObjectsClient(cfg, logger=logging.getLogger("test"))
+        slack.web_client = FakeWebClient()
+        slack.api = FakeApiCaller(cfg)
+        slack._users = None
+        return slack.users()
+
+    def test_unbound_raises(self):
+        """Unbound instance (no user_id) should raise ValueError."""
+        users = _make_users()
+        with pytest.raises(ValueError, match="requires a bound user_id"):
+            users.is_user_authorized("some_service")
+
+    def test_no_groups_configured_returns_false(self):
+        """Service with no configured groups returns False."""
+        users = _make_users()
+        users.user_id = "U123"
+        assert users.is_user_authorized("nonexistent_service") is False
+
+    def test_read_level_checks_read_groups(self):
+        """auth_level='read' should consult auth_idp_groups_read_access."""
+        users = self._make_users_with_auth(read_access={"my_svc": ["G001"]})
+        users.user_id = "U123"
+
+        from unittest.mock import patch
+        with patch("slack_objects.idp_groups.IDP_groups") as MockIDP:
+            MockIDP.return_value.is_member.return_value = True
+            assert users.is_user_authorized("my_svc", auth_level="read") is True
+            MockIDP.return_value.is_member.assert_called_once_with(user_id="U123", group_id="G001")
+
+    def test_write_level_checks_write_groups(self):
+        """auth_level='write' should consult auth_idp_groups_write_access."""
+        users = self._make_users_with_auth(write_access={"my_svc": ["G002"]})
+        users.user_id = "U123"
+
+        from unittest.mock import patch
+        with patch("slack_objects.idp_groups.IDP_groups") as MockIDP:
+            MockIDP.return_value.is_member.return_value = False
+            assert users.is_user_authorized("my_svc", auth_level="write") is False
+
+    def test_returns_true_on_first_matching_group(self):
+        """Should return True as soon as any group matches (short-circuit)."""
+        users = self._make_users_with_auth(read_access={"my_svc": ["G001", "G002"]})
+        users.user_id = "U123"
+
+        from unittest.mock import patch
+        with patch("slack_objects.idp_groups.IDP_groups") as MockIDP:
+            MockIDP.return_value.is_member.side_effect = [False, True]
+            assert users.is_user_authorized("my_svc") is True
+            assert MockIDP.return_value.is_member.call_count == 2
