@@ -239,6 +239,18 @@ class TestResolveUserId:
         with pytest.raises(ValueError, match="must not be empty"):
             users.resolve_user_id("   ")
 
+    def test_at_prefixed_user_id_resolves_via_web_api(self):
+        """@U1234 should verify via users.info, not SCIM username search."""
+        users = _make_users()
+        assert users.resolve_user_id("@U01ABC123") == "U01ABC123"
+
+    def test_at_prefixed_user_id_not_found_raises(self):
+        """@U00GHOST raises LookupError when users.info fails."""
+        users = _make_users()
+        users.get_user_info = MagicMock(return_value={"ok": False, "error": "user_not_found"})
+        with pytest.raises(LookupError, match="No user found for user ID"):
+            users.resolve_user_id("@U00GHOST")
+
 # ═══════════════════════════════════════════════════════════════════════════
 # is_user_authorized
 # ═══════════════════════════════════════════════════════════════════════════
