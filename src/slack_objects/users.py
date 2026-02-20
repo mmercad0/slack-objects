@@ -505,21 +505,21 @@ class Users(ScimMixin, SlackObjectBase):
 
         # ── 3. @username handle ───────────────────────────────────
         if identifier.startswith("@"):
-            username = identifier.removeprefix("@")
+            stripped = identifier.removeprefix("@")
 
             # The caller may have passed "@U1234" — recognise the ID
             # and verify via the cheaper Web API instead of SCIM.
-            if self._looks_like_user_id(username):
-                resp = self.get_user_info(username)
+            if self._looks_like_user_id(stripped):
+                resp = self.get_user_info(stripped)
                 if resp.get("ok"):
-                    return username
-                raise LookupError(f"No user found for user ID: {username}")
+                    return stripped
+                raise LookupError(f"No user found for user ID: {stripped}")
 
-            uid = self._first_scim_user_id(self.scim_search_user_by_username(username))
+            uid = self._first_scim_user_id(self.scim_search_user_by_username(stripped))
             if uid:
                 return uid
 
-            raise LookupError(f"No user found for username: @{username}")
+            raise LookupError(f"No user found for username: @{stripped}")
 
         # ── 4. Bare string — try as username via SCIM ─────────────
         uid = self._first_scim_user_id(self.scim_search_user_by_username(identifier))
