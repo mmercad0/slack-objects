@@ -483,6 +483,13 @@ class Users(ScimMixin, SlackObjectBase):
             resp = self.get_user_info(identifier)
             if resp.get("ok"):
                 return identifier
+
+            # Slow path: SCIM (active + deactivated)
+            self.logger.info("Web API miss for %s — falling back to SCIM lookup", identifier)
+            scim_resp = self._scim_request(path=f"Users/{identifier}", method="GET")
+            if scim_resp.ok and scim_resp.data.get("id"):
+                return scim_resp.data["id"]
+
             raise LookupError(f"No user found for user ID: {identifier}")
 
         # ── 2. Email address ──────────────────────────────────────
@@ -513,6 +520,13 @@ class Users(ScimMixin, SlackObjectBase):
                 resp = self.get_user_info(stripped)
                 if resp.get("ok"):
                     return stripped
+
+                # Slow path: SCIM (active + deactivated)
+                self.logger.info("Web API miss for %s — falling back to SCIM lookup", stripped)
+                scim_resp = self._scim_request(path=f"Users/{stripped}", method="GET")
+                if scim_resp.ok and scim_resp.data.get("id"):
+                    return scim_resp.data["id"]
+
                 raise LookupError(f"No user found for user ID: {stripped}")
 
             uid = self._first_scim_user_id(self.scim_search_user_by_username(stripped))
