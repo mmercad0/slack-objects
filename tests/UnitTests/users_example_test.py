@@ -172,9 +172,12 @@ class TestResolveUserId:
         assert users.resolve_user_id("W0ABC") == "W0ABC"
 
     def test_user_id_not_found_raises(self):
-        """Non-existent user ID raises LookupError."""
+        """Non-existent user ID raises LookupError after Web API + SCIM miss."""
         users = _make_users()
         users.get_user_info = MagicMock(return_value={"ok": False, "error": "user_not_found"})
+        users._scim_request = MagicMock(
+            return_value=ScimResponse(ok=False, status_code=404, data={}, text="")
+        )
         with pytest.raises(LookupError, match="No user found for user ID"):
             users.resolve_user_id("U00GHOST")
 
@@ -245,9 +248,12 @@ class TestResolveUserId:
         assert users.resolve_user_id("@U01ABC123") == "U01ABC123"
 
     def test_at_prefixed_user_id_not_found_raises(self):
-        """@U00GHOST raises LookupError when users.info fails."""
+        """@U00GHOST raises LookupError when both Web API and SCIM miss."""
         users = _make_users()
         users.get_user_info = MagicMock(return_value={"ok": False, "error": "user_not_found"})
+        users._scim_request = MagicMock(
+            return_value=ScimResponse(ok=False, status_code=404, data={}, text="")
+        )
         with pytest.raises(LookupError, match="No user found for user ID"):
             users.resolve_user_id("@U00GHOST")
 

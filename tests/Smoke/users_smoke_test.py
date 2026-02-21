@@ -160,6 +160,13 @@ def main() -> None:
             lambda: bound.scim_update_user_attribute(user_id="U1", attribute="active", new_value=False),
         ),
         CallSpec("make_multi_channel_guest()", lambda: bound.make_multi_channel_guest()),
+
+        # SCIM search primitives
+        CallSpec("scim_search_user_by_email()", lambda: bound.scim_search_user_by_email("test@example.com")),
+        CallSpec("scim_search_user_by_username()", lambda: bound.scim_search_user_by_username("testuser")),
+
+        # Identifier resolution
+        CallSpec("resolve_user_id(user_id)", lambda: bound.resolve_user_id("U1")),
     ]
 
     run_smoke("Users smoke (all public methods)", specs)

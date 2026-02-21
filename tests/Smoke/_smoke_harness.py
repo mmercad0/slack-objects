@@ -248,6 +248,14 @@ class FakeScimSession:
 
         # --- SCIM Users endpoints (used by Users SCIM methods) ---
         if "/Users" in url and "Groups" not in url:
+            if method_upper == "GET":
+                # scim_search_user_by_email / scim_search_user_by_username (filter)
+                # or direct lookup Users/{id}
+                if "filter" in (params or {}):
+                    return Resp({"Resources": [{"id": "U1", "userName": "testuser"}], "totalResults": 1})
+                # Direct GET Users/{id}
+                return Resp({"id": "U1", "userName": "testuser", "active": True})
+
             if method_upper == "POST":
                 # scim_create_user
                 return Resp({"id": "U_SCIM_NEW", "userName": "testuser"}, 201)
