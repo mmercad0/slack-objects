@@ -106,7 +106,12 @@ class TestIsActive:
         with pytest.raises(ValueError):
             users.is_active()
 
-
+    def test_override_with_different_user_id(self, ctx):
+        """Passing user_id to an already-bound instance fetches fresh data."""
+        bound = _bound(ctx, ctx.active_member_id)
+        # Override with a deactivated user — should return False
+        assert bound.is_active(user_id=ctx.deactivated_user_id) is False
+        _pause()
 # ═══════════════════════════════════════════════════════════════════════════
 # 2.  is_guest
 # ═══════════════════════════════════════════════════════════════════════════

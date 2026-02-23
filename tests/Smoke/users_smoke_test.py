@@ -119,6 +119,7 @@ def main() -> None:
         CallSpec("is_contingent_worker()", lambda: (_refresh_bound(), bound.is_contingent_worker())),
         CallSpec("is_guest()", lambda: (_refresh_bound(), bound.is_guest())),
         CallSpec("is_active()", lambda: (_refresh_bound(), bound.is_active())),
+        CallSpec("is_active(user_id override)", lambda: (_refresh_bound(), bound.is_active(user_id="U2"))),
         CallSpec("is_active_scim()", lambda: bound.is_active_scim()),
 
         # Admin helpers

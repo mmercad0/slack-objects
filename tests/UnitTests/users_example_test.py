@@ -15,12 +15,14 @@ class FakeWebClient:
         payload = json or {}
 
         if method == "users.info":
+            user_id = payload.get("user", "U_TEST")
             return {"ok": True, "user": {
-                "id": payload.get("user", "U_TEST"),
+                "id": user_id,
                 "real_name": "[External] Test User",
                 "profile": {"display_name": "Testy"},
                 "is_restricted": False,
                 "is_ultra_restricted": False,
+                "deleted": user_id == "UDELETED",
             }}
 
         if method == "users.lookupByEmail":
@@ -387,3 +389,50 @@ class TestIsActiveScim:
             return_value=ScimResponse(ok=True, status_code=200, data={"id": "U1"}, text=""),
         )
         assert bound.is_active_scim() is False
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# is_active with user_id override
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestIsActiveWithUserId:
+    """is_active — covers the optional user_id parameter."""
+
+    def test_bound_user_active(self):
+        """Bound user uses cached attributes."""
+        users = _make_users()
+        bound = users.with_user("U123")
+        bound.refresh()
+        assert bound.is_active() is True
+
+    def test_bound_user_deleted(self):
+        """Bound deleted user returns False."""
+        users = _make_users()
+        bound = users.with_user("UDELETED")
+        bound.refresh()
+        assert bound.is_active() is False
+
+    def test_override_active(self):
+        """Passing a different user_id fetches fresh info."""
+        users = _make_users()
+        bound = users.with_user("UDELETED")
+        bound.refresh()
+        # Override with an active user
+        assert bound.is_active(user_id="U123") is True
+
+    def test_override_deleted(self):
+        """Passing a deleted user_id returns False."""
+        users = _make_users()
+        bound = users.with_user("U123")
+        bound.refresh()
+        # Override with a deleted user
+        assert bound.is_active(user_id="UDELETED") is False
+
+    def test_same_user_id_uses_cache(self):
+        """Passing the same user_id as bound uses cached attributes (no extra call)."""
+        users = _make_users()
+        bound = users.with_user("U123")
+        bound.refresh()
+        bound.get_user_info = MagicMock()
+        assert bound.is_active(user_id="U123") is True
+        bound.get_user_info.assert_not_called()
