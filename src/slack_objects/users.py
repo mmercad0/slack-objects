@@ -235,7 +235,7 @@ class Users(ScimMixin, SlackObjectBase):
         attrs = self._require_attributes()
         return bool(attrs.get("is_restricted") or attrs.get("is_ultra_restricted"))
 
-    def is_active(self) -> bool:
+    def is_active(self, user_id: Optional[str] = None) -> bool:
         """Return True if the user account is not deactivated (deleted).
 
         .. note::
@@ -243,8 +243,18 @@ class Users(ScimMixin, SlackObjectBase):
            workspaces, even if the account is still active at the org level.
            Use :meth:`is_active_scim` for the org-scoped check.
         """
-        attrs = self._require_attributes()
-        return not bool(attrs.get("deleted", False))
+        if user_id and user_id != self.user_id:
+            resp = self.get_user_info(user_id)
+            if not resp.get("ok"):
+                raise RuntimeError(f"get_user_info failed: {safe_error_context(resp)}")
+            user_data = resp.get("user") or {}
+        else:
+            user_data = self._require_attributes()
+
+        # Slack always returns "deleted" in users.info responses;
+        # default to False (assume active) for manually-set attributes.
+        is_deleted = bool(user_data.get("deleted", False))
+        return not is_deleted
 
     def is_active_scim(self, user_id: Optional[str] = None) -> bool:
         """
