@@ -141,10 +141,15 @@ cfg = SlackObjectsConfig(
 
 ## Testing
 
+Run unit tests:
+```bash
+python -m pytest tests/UnitTests -v --tb=short
+```
+
 Run all smoke tests:
 
 ```bash
-python -m tests.run_all_smoke
+python -m tests.Smoke.run_all_smoke
 ```
 
 ---

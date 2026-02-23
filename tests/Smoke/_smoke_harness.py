@@ -8,8 +8,8 @@ Shared smoke-test harness for slack-objects object helpers.
 - run_smoke: runs and reports call specs
 
 Run any smoke test:
-    python -m tests.users_smoke_test
-    python -m tests.messages_smoke_test
+    python -m tests.Smoke.users_smoke_test
+    python -m tests.Smoke.messages_smoke_test
     ...etc
 """
 

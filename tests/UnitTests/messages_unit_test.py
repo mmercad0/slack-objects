@@ -1,4 +1,4 @@
-# tests/messages_example_test.py
+# tests/UnitTests/messages_unit_test.py
 
 import unittest
 from typing import Any, Dict, Optional, List
@@ -59,7 +59,7 @@ class FakeApiCaller:
         return client.api_call(method, json=kwargs)
 
 
-class MessagesExampleTests(unittest.TestCase):
+class MessagesUnitTests(unittest.TestCase):
     def setUp(self):
         self.cfg = SlackObjectsConfig(bot_token="xoxb-test")
         self.client = FakeClient()

@@ -1,6 +1,6 @@
-# tests/idp_groups_example_test.py
+# tests/UnitTests/idp_groups_unit_test.py
 """
-Example + unit-test-friendly harness for IDP_groups.
+Unit-test harness for IDP_groups.
 
 This file is designed to:
 1) Demonstrate intended factory-style usage:
@@ -11,9 +11,9 @@ This file is designed to:
 
 Run options:
 - pytest:
-    pytest -q tests/idp_groups_example_test.py
+    pytest -q tests/UnitTests/idp_groups_unit_test.py
 - plain python (runs a minimal smoke test):
-    python tests/idp_groups_example_test.py
+    python tests/UnitTests/idp_groups_unit_test.py
 """
 
 from __future__ import annotations
