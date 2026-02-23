@@ -76,8 +76,18 @@ class TestIsActive:
         assert _bound(ctx, ctx.active_admin_id).is_active() is True
 
     def test_active_owner(self, ctx):
-        """Active owner returns True."""
-        assert _bound(ctx, ctx.active_owner_id).is_active() is True
+        """Owner with no workspaces appears deleted in Web API (0-workspace quirk).
+
+        The Web API ``users.info`` returns ``deleted: True`` for users removed
+        from all workspaces even though they are still active at the org level.
+        Use ``is_active_scim()`` to get the true org-level status.
+        """
+        bound = _bound(ctx, ctx.active_owner_id)
+        assert bound.is_active() is False  # Web API quirk: no workspaces → deleted
+        _pause()
+
+        # Confirm the user is truly active at the org level
+        assert bound.is_active_scim() is True
 
     def test_single_channel_guest(self, ctx):
         """Active SCG returns True."""
@@ -170,3 +180,58 @@ class TestIsContingentWorker:
         """Unbound instance with no attributes raises ValueError."""
         with pytest.raises(ValueError):
             users.is_contingent_worker()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 4.  is_active_scim
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestIsActiveScim:
+    """is_active_scim — org-level active check via SCIM, not affected by 0-workspace quirk."""
+
+    def test_active_member(self, ctx):
+        """Active member returns True at org level."""
+        bound = _get_ctx().slack.users(ctx.active_member_id)
+        assert bound.is_active_scim() is True
+        _pause()
+
+    def test_active_admin(self, ctx):
+        """Active admin returns True at org level."""
+        bound = _get_ctx().slack.users(ctx.active_admin_id)
+        assert bound.is_active_scim() is True
+        _pause()
+
+    def test_active_owner(self, ctx):
+        """Active owner returns True at org level."""
+        bound = _get_ctx().slack.users(ctx.active_owner_id)
+        assert bound.is_active_scim() is True
+        _pause()
+
+    def test_single_channel_guest(self, ctx):
+        """Active SCG returns True at org level."""
+        bound = _get_ctx().slack.users(ctx.single_channel_guest_id)
+        assert bound.is_active_scim() is True
+        _pause()
+
+    def test_multi_channel_guest(self, ctx):
+        """Active MCG returns True at org level."""
+        bound = _get_ctx().slack.users(ctx.multi_channel_guest_id)
+        assert bound.is_active_scim() is True
+        _pause()
+
+    def test_deactivated_user(self, ctx):
+        """Truly deactivated user returns False at org level."""
+        bound = _get_ctx().slack.users(ctx.deactivated_user_id)
+        assert bound.is_active_scim() is False
+        _pause()
+
+    def test_unbound_no_user_id_raises(self, users):
+        """Unbound instance with no user_id raises ValueError."""
+        with pytest.raises(ValueError, match="requires user_id"):
+            users.is_active_scim()
+
+    def test_explicit_user_id(self, ctx, users):
+        """Passing user_id explicitly works on an unbound instance."""
+        result = users.is_active_scim(user_id=ctx.active_member_id)
+        assert result is True
+        _pause()

@@ -236,9 +236,32 @@ class Users(ScimMixin, SlackObjectBase):
         return bool(attrs.get("is_restricted") or attrs.get("is_ultra_restricted"))
 
     def is_active(self) -> bool:
-        """Return True if the user account is not deactivated (deleted)."""
+        """Return True if the user account is not deactivated (deleted).
+
+        .. note::
+           The Web API returns ``deleted: True`` for users removed from **all**
+           workspaces, even if the account is still active at the org level.
+           Use :meth:`is_active_scim` for the org-scoped check.
+        """
         attrs = self._require_attributes()
         return not bool(attrs.get("deleted", False))
+
+    def is_active_scim(self, user_id: Optional[str] = None) -> bool:
+        """
+        Return True if the user is active at the **org level** via SCIM.
+
+        Unlike ``is_active()``, this is not affected by the Slack quirk
+        where a user removed from all workspaces appears as
+        ``"deleted": True`` in the Web API.
+        """
+        uid = user_id or self.user_id
+        if not uid:
+            raise ValueError("is_active_scim requires user_id (passed or bound)")
+
+        scim_resp = self._scim_request(path=f"Users/{uid}", method="GET")
+        if not scim_resp.ok:
+            return False
+        return bool(scim_resp.data.get("active", False))
 
     # ---------- auth helpers ----------
 

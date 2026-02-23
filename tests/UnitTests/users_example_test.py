@@ -327,3 +327,63 @@ class TestIsUserAuthorized:
         users = _make_users()
         with pytest.raises(ValueError, match="requires a bound user_id"):
             users.is_user_authorized("my_service")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# is_active_scim
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestIsActiveScim:
+    """is_active_scim — org-level active check via SCIM GET Users/{id}."""
+
+    def test_active_user_returns_true(self):
+        """SCIM active=True ⇒ is_active_scim() returns True."""
+        users = _make_users()
+        bound = users.with_user("U1")
+        bound._scim_request = MagicMock(
+            return_value=ScimResponse(ok=True, status_code=200, data={"id": "U1", "active": True}, text=""),
+        )
+        assert bound.is_active_scim() is True
+
+    def test_inactive_user_returns_false(self):
+        """SCIM active=False ⇒ is_active_scim() returns False."""
+        users = _make_users()
+        bound = users.with_user("U1")
+        bound._scim_request = MagicMock(
+            return_value=ScimResponse(ok=True, status_code=200, data={"id": "U1", "active": False}, text=""),
+        )
+        assert bound.is_active_scim() is False
+
+    def test_scim_failure_returns_false(self):
+        """SCIM request failure ⇒ is_active_scim() returns False."""
+        users = _make_users()
+        bound = users.with_user("U1")
+        bound._scim_request = MagicMock(
+            return_value=ScimResponse(ok=False, status_code=404, data={}, text=""),
+        )
+        assert bound.is_active_scim() is False
+
+    def test_explicit_user_id_overrides_bound(self):
+        """Passing user_id explicitly takes precedence over bound user_id."""
+        users = _make_users()
+        bound = users.with_user("U_IGNORED")
+        bound._scim_request = MagicMock(
+            return_value=ScimResponse(ok=True, status_code=200, data={"id": "U_OTHER", "active": True}, text=""),
+        )
+        assert bound.is_active_scim(user_id="U_OTHER") is True
+        bound._scim_request.assert_called_once_with(path="Users/U_OTHER", method="GET")
+
+    def test_no_user_id_raises(self):
+        """Unbound instance with no user_id raises ValueError."""
+        users = _make_users()
+        with pytest.raises(ValueError, match="requires user_id"):
+            users.is_active_scim()
+
+    def test_missing_active_key_returns_false(self):
+        """SCIM response without 'active' key ⇒ False (safe default)."""
+        users = _make_users()
+        bound = users.with_user("U1")
+        bound._scim_request = MagicMock(
+            return_value=ScimResponse(ok=True, status_code=200, data={"id": "U1"}, text=""),
+        )
+        assert bound.is_active_scim() is False

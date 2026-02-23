@@ -50,6 +50,7 @@ _KEYVAULT_NAME = "Slack-AI-assistant-KV"
 # Key Vault secret names
 _SECRET_BOT_TOKEN = "Bot-token-SB"
 _SECRET_USER_TOKEN = "User-token-SB"
+_SECRET_SCIM_TOKEN = "User-token-SB" # There's no separate SCIM token at the moment
 
 
 # ---------------------------------------------------------------------------
@@ -138,10 +139,12 @@ def build_live_context(
     kv = Key_Vault(_KEYVAULT_NAME)
     bot_token = kv.get_secret(_SECRET_BOT_TOKEN)
     user_token = kv.get_secret(_SECRET_USER_TOKEN)
+    scim_token = kv.get_secret(_SECRET_SCIM_TOKEN)
 
     cfg = SlackObjectsConfig(
         bot_token=bot_token,
         user_token=user_token,
+        scim_token=scim_token,
     )
 
     logger = logging.getLogger("slack-objects.users-live-tests")
