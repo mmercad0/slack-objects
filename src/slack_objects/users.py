@@ -511,6 +511,11 @@ class Users(ScimMixin, SlackObjectBase):
 
         identifier = identifier.strip()
 
+        # Normalize: strip leading '@' so "@U1234" falls into the user-ID
+        # path and "@alice" falls into the username path — no special stage needed.
+        if identifier.startswith("@"):
+            identifier = identifier.removeprefix("@")
+
         # ── 1. Slack user ID ──────────────────────────────────────
         if self._looks_like_user_id(identifier):
             resp = self.get_user_info(identifier)
@@ -543,32 +548,9 @@ class Users(ScimMixin, SlackObjectBase):
 
             raise LookupError(f"No user found for email: {identifier}")
 
-        # ── 3. @username handle ───────────────────────────────────
-        if identifier.startswith("@"):
-            stripped = identifier.removeprefix("@")
-
-            # The caller may have passed "@U1234" — recognise the ID
-            # and verify via the cheaper Web API instead of SCIM.
-            if self._looks_like_user_id(stripped):
-                resp = self.get_user_info(stripped)
-                if resp.get("ok"):
-                    return stripped
-
-                # Slow path: SCIM (active + deactivated)
-                self.logger.info("Web API miss for %s — falling back to SCIM lookup", stripped)
-                scim_resp = self._scim_request(path=f"Users/{stripped}", method="GET")
-                if scim_resp.ok and scim_resp.data.get("id"):
-                    return scim_resp.data["id"]
-
-                raise LookupError(f"No user found for user ID: {stripped}")
-
-            uid = self._first_scim_user_id(self.scim_search_user_by_username(stripped))
-            if uid:
-                return uid
-
-            raise LookupError(f"No user found for username: @{stripped}")
-
-        # ── 4. Bare string — try as username via SCIM ─────────────
+        # ── 3. Bare string / username — SCIM only ─────────────────
+        # No Web API endpoint exists for username lookup; SCIM is the
+        # only option. This also handles "@alice" (already stripped above).
         uid = self._first_scim_user_id(self.scim_search_user_by_username(identifier))
         if uid:
             return uid
