@@ -169,6 +169,8 @@ def main() -> None:
 
         # Identifier resolution
         CallSpec("resolve_user_id(user_id)", lambda: bound.resolve_user_id("U1")),
+        CallSpec("resolve_user_id(email)", lambda: bound.resolve_user_id("found@example.com")),
+        CallSpec("resolve_user_id(@username)", lambda: bound.resolve_user_id("@testuser")),
     ]
 
     run_smoke("Users smoke (all public methods)", specs)

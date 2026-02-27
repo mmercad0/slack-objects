@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional
 from unittest.mock import MagicMock
 
 import pytest
+from slack_sdk.errors import SlackApiError
 
 from slack_objects.client import SlackObjectsClient
 from slack_objects.config import SlackObjectsConfig, RateTier, USER_ID_RE
@@ -182,6 +183,9 @@ class TestResolveUserId:
         )
         with pytest.raises(LookupError, match="No user found for user ID"):
             users.resolve_user_id("U00GHOST")
+        users._scim_request.assert_called_once_with(
+            path="Users/U00GHOST", method="GET", raise_for_status=False,
+        )
 
     def test_email_active_user(self):
         """Active user email resolves via Web API (fast path)."""
@@ -221,7 +225,7 @@ class TestResolveUserId:
         scim_resp = ScimResponse(ok=True, status_code=200, data={"Resources": []}, text="")
         users.scim_search_user_by_username = MagicMock(return_value=scim_resp)
 
-        with pytest.raises(LookupError, match="No user found for username"):
+        with pytest.raises(LookupError, match="No user found for identifier"):
             users.resolve_user_id("@ghost")
 
     def test_bare_username(self):
@@ -258,6 +262,43 @@ class TestResolveUserId:
         )
         with pytest.raises(LookupError, match="No user found for user ID"):
             users.resolve_user_id("@U00GHOST")
+        users._scim_request.assert_called_once_with(
+            path="Users/U00GHOST", method="GET", raise_for_status=False,
+        )
+
+    def test_user_id_slack_api_error_falls_back_to_scim(self):
+        """SlackApiError from users.info falls through to SCIM lookup."""
+        users = _make_users()
+        users.get_user_info = MagicMock(
+            side_effect=SlackApiError("users_not_found", response=MagicMock())
+        )
+        scim_resp = ScimResponse(
+            ok=True, status_code=200,
+            data={"id": "USCIM", "userName": "scim-user", "active": True},
+            text="",
+        )
+        users._scim_request = MagicMock(return_value=scim_resp)
+
+        assert users.resolve_user_id("USCIM") == "USCIM"
+        users._scim_request.assert_called_once_with(
+            path="Users/USCIM", method="GET", raise_for_status=False,
+        )
+
+    def test_user_id_slack_api_error_and_scim_miss_raises(self):
+        """SlackApiError + SCIM miss still raises LookupError."""
+        users = _make_users()
+        users.get_user_info = MagicMock(
+            side_effect=SlackApiError("users_not_found", response=MagicMock())
+        )
+        users._scim_request = MagicMock(
+            return_value=ScimResponse(ok=False, status_code=404, data={}, text="")
+        )
+        with pytest.raises(LookupError, match="No user found for user ID"):
+            users.resolve_user_id("U00GHOST")
+        users._scim_request.assert_called_once_with(
+            path="Users/U00GHOST", method="GET", raise_for_status=False,
+        )
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # is_user_authorized
@@ -373,7 +414,9 @@ class TestIsActiveScim:
             return_value=ScimResponse(ok=True, status_code=200, data={"id": "U_OTHER", "active": True}, text=""),
         )
         assert bound.is_active_scim(user_id="U_OTHER") is True
-        bound._scim_request.assert_called_once_with(path="Users/U_OTHER", method="GET")
+        bound._scim_request.assert_called_once_with(
+            path="Users/U_OTHER", method="GET", raise_for_status=False,
+        )
 
     def test_no_user_id_raises(self):
         """Unbound instance with no user_id raises ValueError."""
