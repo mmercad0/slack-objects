@@ -518,9 +518,12 @@ class Users(ScimMixin, SlackObjectBase):
 
         # ── 1. Slack user ID ──────────────────────────────────────
         if self._looks_like_user_id(identifier):
-            resp = self.get_user_info(identifier)
-            if resp.get("ok"):
-                return identifier
+            try:
+                resp = self.get_user_info(identifier)
+                if resp.get("ok"):
+                    return identifier
+            except SlackApiError:
+                pass  # expected for deactivated / not-found users
 
             # Slow path: SCIM (active + deactivated)
             self.logger.info("Web API miss for %s — falling back to SCIM lookup", identifier)
