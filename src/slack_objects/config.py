@@ -38,6 +38,9 @@ class SlackObjectsConfig:
 	user_token: Optional[str] = field(default=None, repr=False)
 	scim_token: Optional[str] = field(default=None, repr=False)
 
+	# Workspace ID — required for org-wide tokens when calling workspace-scoped Web APIs
+	team_id: Optional[str] = None
+
 	default_rate_tier: RateTier = RateTier.TIER_2
 
 	auth_idp_groups_read_access: dict[str, list[str]] = field(default_factory=dict)
@@ -59,6 +62,7 @@ class SlackObjectsConfig:
 			f"bot_token={_mask(self.bot_token)}, "
 			f"user_token={_mask(self.user_token)}, "
 			f"scim_token={_mask(self.scim_token)}, "
+			f"team_id={self.team_id}, "
 			f"default_rate_tier={self.default_rate_tier}, "
 			f"auth_idp_groups_read_access={self.auth_idp_groups_read_access}, "
 			f"auth_idp_groups_write_access={self.auth_idp_groups_write_access}, "
