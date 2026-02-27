@@ -20,6 +20,7 @@ Design decisions
 - SCIM REST calls are centralized in ScimMixin._scim_request(); all public methods call endpoint wrappers.
 - Uses an injectable `requests.Session` (`scim_session`) so tests can pass a fake session.
 - Keeps legacy output shapes: lists of dicts for groups and members.
+- This module is SCIM-only. For Slack-native usergroups, see ``usergroups.py``.
 """
 
 from dataclasses import dataclass, field
@@ -57,6 +58,15 @@ class IDP_groups(ScimMixin, SlackObjectBase):
             group_id=group_id,
             scim_session=self.scim_session,
         )
+
+    # ---------- identifier resolution ----------
+
+    def _resolve_group_id(self, group_id: Optional[str] = None) -> str:
+        """Resolve group_id from argument or bound instance value."""
+        gid = group_id or self.group_id
+        if not gid:
+            raise ValueError("group_id is required (passed or bound)")
+        return gid
 
     # ---------- endpoint wrappers (only these call _scim_request) ----------
 
@@ -122,21 +132,20 @@ class IDP_groups(ScimMixin, SlackObjectBase):
 
     def get_members(self, group_id: Optional[str] = None) -> List[Dict[str, str]]:
         """
-        Return the members of a group as a list of dicts `{'value': <user_id>, 'display': <name>}`.
+        Return group members via SCIM (GET Groups/{id}) as a list of dicts `{'value': <user_id>, 'display': <name>}`.
 
-        If `group_id` omitted, uses bound `self.group_id`. Raises ValueError if none provided.
+        This module is SCIM-only. For Slack-native usergroups, see
+        ``Usergroups.get_members()`` in ``usergroups.py``.
         """
-        gid = group_id or self.group_id
-        if not gid:
-            raise ValueError("get_members requires group_id (passed or bound)")
-
+        gid = self._resolve_group_id(group_id)
         scim_resp = self._scim_group_get(gid)
-        # In the legacy scripts, group members are at `members` in the response body
         return scim_resp.data.get("members", [])
 
     def is_member(self, user_id: str, group_id: Optional[str] = None) -> bool:
         """
-        Return True if `user_id` is a member of `group_id`.
+        Return True if ``user_id`` is a member of ``group_id`` (via SCIM).
+
+        Higher-level convenience that composes on ``get_members()``.
         Preserves legacy semantics (scans the members list).
         """
         members = self.get_members(group_id=group_id)
