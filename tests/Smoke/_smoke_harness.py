@@ -190,6 +190,21 @@ class FakeWebClient:
                 "offset": "",
             }
 
+        # ---------------------------
+        # Usergroups
+        # ---------------------------
+        if method == "usergroups.list":
+            return {
+                "ok": True,
+                "usergroups": [
+                    {"id": "S0614TZR7", "name": "Team Admins", "handle": "admins"},
+                    {"id": "S0615ABC8", "name": "Developers", "handle": "devs"},
+                ],
+            }
+
+        if method == "usergroups.users.list":
+            return {"ok": True, "users": ["U1", "U2"]}
+
         # Default: ok True
         return {"ok": True}
 

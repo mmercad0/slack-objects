@@ -15,6 +15,7 @@ from tests.Smoke.idp_groups_smoke_test import main as idp_main
 from tests.Smoke.workspaces_smoke_test import main as workspaces_main
 from tests.Smoke.api_caller_smoke_test import main as api_caller_main
 from tests.Smoke.security_smoke_test import main as security_main
+from tests.Smoke.usergroups_smoke_test import main as usergroups_main
 
 
 def main() -> None:
@@ -26,6 +27,7 @@ def main() -> None:
     workspaces_main()
     api_caller_main()
     security_main()
+    usergroups_main()
     print("\n✅ All smoke tests completed successfully.")
 
 
