@@ -527,7 +527,11 @@ class Users(ScimMixin, SlackObjectBase):
 
             # Slow path: SCIM (active + deactivated)
             self.logger.info("Web API miss for %s — falling back to SCIM lookup", identifier)
-            scim_resp = self._scim_request(path=f"Users/{identifier}", method="GET")
+            scim_resp = self._scim_request(
+                path=f"Users/{identifier}",
+                method="GET",
+                raise_for_status=False,
+            )
             if scim_resp.ok and scim_resp.data.get("id"):
                 return scim_resp.data["id"]
 
