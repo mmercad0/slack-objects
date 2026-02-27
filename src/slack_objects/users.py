@@ -268,7 +268,11 @@ class Users(ScimMixin, SlackObjectBase):
         if not uid:
             raise ValueError("is_active_scim requires user_id (passed or bound)")
 
-        scim_resp = self._scim_request(path=f"Users/{uid}", method="GET")
+        scim_resp = self._scim_request(
+            path=f"Users/{uid}",
+            method="GET",
+            raise_for_status=False,      # ← same fix needed here
+        )
         if not scim_resp.ok:
             return False
         return bool(scim_resp.data.get("active", False))
@@ -540,12 +544,9 @@ class Users(ScimMixin, SlackObjectBase):
         # ── 2. Email address ──────────────────────────────────────
         if EMAIL_RE.match(identifier):
             # Fast path: Web API (active users only)
-            try:
-                uid = self.get_user_id_from_email(identifier)
-                if uid:
-                    return uid
-            except SlackApiError:
-                pass  # expected for deactivated / not-found users
+            uid = self.get_user_id_from_email(identifier)
+            if uid:
+                return uid
 
             # Slow path: SCIM (active + deactivated)
             self.logger.info("Web API miss for %s — falling back to SCIM search", identifier)
