@@ -271,7 +271,7 @@ class Users(ScimMixin, SlackObjectBase):
         scim_resp = self._scim_request(
             path=f"Users/{uid}",
             method="GET",
-            raise_for_status=False,      # ← same fix needed here
+            raise_for_status=False,
         )
         if not scim_resp.ok:
             return False
