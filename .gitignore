@@ -30,3 +30,6 @@ src/slack_objects/_version.py
 
 # Examples config (contains Key Vault / secret names)
 /tests/Examples/examples_config.json
+/.vs/slnx.sqlite
+/.vs/VSWorkspaceState.json
+/src/slack_objects/.vs
