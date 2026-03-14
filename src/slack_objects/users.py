@@ -646,6 +646,51 @@ class Users(ScimMixin, SlackObjectBase):
 
         return self._scim_request(path=f"Users/{user_id}", method="PATCH", payload=payload)
 
+    def scim_update_email(
+        self,
+        *,
+        user_id: Optional[str] = None,
+        new_email: str,
+    ) -> ScimResponse:
+        """Update a user's primary email address via SCIM PATCH.
+
+        This is intentionally separate from :meth:`scim_update_user_attribute`
+        because email updates require a structurally different payload in both
+        SCIM versions (value-filter path in v2, typed email array in v1).
+
+        Accepts a plain email-address string and builds the version-correct
+        payload automatically:
+        - v2: value-filter path ``emails[primary eq true].value`` to avoid
+              the "more than one primary element" conflict.
+        - v1: wraps the address in the standard SCIM email array.
+        """
+        uid = user_id or self.user_id
+        if not uid:
+            raise ValueError("scim_update_email requires user_id (passed or bound)")
+        validate_scim_id(uid, "user_id")
+
+        scim_version = self.cfg.scim_version
+        if scim_version == "v2":
+            payload = {
+                "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                "Operations": [
+                    {
+                        "op": "replace",
+                        "path": "emails[primary eq true].value",
+                        "value": new_email,
+                    }
+                ],
+            }
+        elif scim_version == "v1":
+            payload = {
+                "schemas": ["urn:scim:schemas:core:1.0"],
+                "emails": [{"value": new_email, "type": "work", "primary": True}],
+            }
+        else:
+            raise NotImplementedError(f"Invalid SCIM version: {scim_version}")
+
+        return self._scim_request(path=f"Users/{uid}", method="PATCH", payload=payload)
+
     def make_multi_channel_guest(self, user_id: Optional[str] = None) -> ScimResponse:
         """Convert a user to a multi-channel guest via SCIM PATCH."""
         uid = user_id or self.user_id

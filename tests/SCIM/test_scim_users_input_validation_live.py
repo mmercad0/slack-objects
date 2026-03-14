@@ -100,3 +100,17 @@ class TestScimInputValidation:
             with pytest.raises(ValueError):
                 users.make_multi_channel_guest(bad_id)
             spy.assert_not_called()
+
+    @pytest.mark.parametrize("bad_id", [
+        "../traversal",
+        "",
+        "id with spaces",
+    ])
+    def test_update_email_rejects_bad_ids(self, users, bad_id):
+        with patch.object(users, "_scim_request", wraps=users._scim_request) as spy:
+            with pytest.raises(ValueError):
+                users.scim_update_email(
+                    user_id=bad_id,
+                    new_email="test@example.com",
+                )
+            spy.assert_not_called()

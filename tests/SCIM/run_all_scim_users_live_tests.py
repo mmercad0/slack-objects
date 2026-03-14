@@ -25,6 +25,7 @@ _TEST_FILES = [
     "test_scim_users_input_validation_live.py",   # no API calls
     "test_scim_users_reactivate_live.py",          # read-mostly (no-ops on active users)
     "test_scim_users_update_attribute_live.py",    # mutating, reversible
+    "test_scim_users_update_email_live.py",        # mutating, reversible
     "test_scim_users_create_live.py",              # self-contained (create + delete)
     "test_scim_users_deactivate_live.py",          # mutating, reversible (strips workspaces)
     "test_scim_users_make_guest_live.py",          # DESTRUCTIVE (disposable users only)

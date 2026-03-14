@@ -161,6 +161,14 @@ def main() -> None:
             "scim_update_user_attribute()",
             lambda: bound.scim_update_user_attribute(user_id="U1", attribute="active", new_value=False),
         ),
+        CallSpec(
+            "scim_update_email(by id)",
+            lambda: bound.scim_update_email(user_id="U1", new_email="newemail@example.com"),
+        ),
+        CallSpec(
+            "scim_update_email(bound)",
+            lambda: bound.scim_update_email(new_email="newemail@example.com"),
+        ),
         CallSpec("make_multi_channel_guest()", lambda: bound.make_multi_channel_guest()),
 
         # SCIM search primitives

@@ -479,3 +479,97 @@ class TestIsActiveWithUserId:
         bound.get_user_info = MagicMock()
         assert bound.is_active(user_id="U123") is True
         bound.get_user_info.assert_not_called()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# scim_update_email
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestScimUpdateEmail:
+    """scim_update_email — version-aware SCIM PATCH for primary email."""
+
+    def test_v2_payload_uses_value_filter_path(self):
+        """v2 uses emails[primary eq true].value to avoid multi-primary conflict."""
+        users = _make_users()
+        bound = users.with_user("U1")
+        bound._scim_request = MagicMock(
+            return_value=ScimResponse(ok=True, status_code=200, data={}, text=""),
+        )
+        bound.scim_update_email(user_id="U1", new_email="new@example.com")
+
+        bound._scim_request.assert_called_once()
+        _, kwargs = bound._scim_request.call_args
+        op = kwargs["payload"]["Operations"][0]
+        assert op["op"] == "replace"
+        assert op["path"] == "emails[primary eq true].value"
+        assert op["value"] == "new@example.com"
+
+    def test_v1_payload_uses_email_array(self):
+        """v1 wraps address in standard SCIM email array with primary+type."""
+        users = _make_users()
+        bound = users.with_user("U1")
+        object.__setattr__(bound.cfg, "scim_version", "v1")
+        bound._scim_request = MagicMock(
+            return_value=ScimResponse(ok=True, status_code=200, data={}, text=""),
+        )
+        bound.scim_update_email(user_id="U1", new_email="new@example.com")
+
+        bound._scim_request.assert_called_once()
+        _, kwargs = bound._scim_request.call_args
+        emails = kwargs["payload"]["emails"]
+        assert len(emails) == 1
+        assert emails[0]["value"] == "new@example.com"
+        assert emails[0]["primary"] is True
+        assert emails[0]["type"] == "work"
+
+    def test_falls_back_to_bound_user_id(self):
+        """Omitting user_id uses self.user_id."""
+        users = _make_users()
+        bound = users.with_user("U1")
+        bound._scim_request = MagicMock(
+            return_value=ScimResponse(ok=True, status_code=200, data={}, text=""),
+        )
+        bound.scim_update_email(new_email="new@example.com")
+
+        bound._scim_request.assert_called_once()
+        _, kwargs = bound._scim_request.call_args
+        assert kwargs["path"] == "Users/U1"
+
+    def test_explicit_user_id_overrides_bound(self):
+        """Passing user_id explicitly takes precedence over bound user_id."""
+        users = _make_users()
+        bound = users.with_user("U_IGNORED")
+        bound._scim_request = MagicMock(
+            return_value=ScimResponse(ok=True, status_code=200, data={}, text=""),
+        )
+        bound.scim_update_email(user_id="U_OTHER", new_email="new@example.com")
+
+        bound._scim_request.assert_called_once()
+        _, kwargs = bound._scim_request.call_args
+        assert kwargs["path"] == "Users/U_OTHER"
+
+    def test_no_user_id_raises(self):
+        """Unbound instance with no user_id raises ValueError."""
+        users = _make_users()
+        with pytest.raises(ValueError, match="requires user_id"):
+            users.scim_update_email(new_email="x@example.com")
+
+    def test_invalid_scim_version_raises(self):
+        """Unsupported scim_version raises NotImplementedError."""
+        users = _make_users()
+        bound = users.with_user("U1")
+        object.__setattr__(bound.cfg, "scim_version", "v99")
+        with pytest.raises(NotImplementedError, match="Invalid SCIM version"):
+            bound.scim_update_email(new_email="x@example.com")
+
+    def test_invalid_user_id_raises(self):
+        """Path-traversal user_id is rejected by validate_scim_id."""
+        users = _make_users()
+        with pytest.raises(ValueError):
+            users.scim_update_email(user_id="../../bad", new_email="x@example.com")
+
+    def test_empty_user_id_raises(self):
+        """Empty user_id is rejected by validate_scim_id."""
+        users = _make_users()
+        with pytest.raises(ValueError):
+            users.scim_update_email(user_id="", new_email="x@example.com")
