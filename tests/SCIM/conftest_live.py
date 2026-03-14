@@ -7,8 +7,8 @@ Test-user IDs and other identifiers are loaded from a JSON file.
 Setup
 -----
 1.  Store your Slack tokens in Azure Key Vault:
-        Bot-token-SB         – xoxb-... bot token with users:read and users:read.email scopes
-        User-token-SB        – xoxp-... user token with admin scope (org-level admin + SCIM provisioning)
+        Bot-token-TEST         – xoxb-... bot token with users:read and users:read.email scopes
+        User-token-TEST        – xoxp-... user token with admin scope (org-level admin + SCIM provisioning)
 
 2.  Set the ``_KEYVAULT_NAME`` constant in this file to your Azure Key Vault name.
 
@@ -51,9 +51,9 @@ _DEFAULT_CONFIG_PATH = _HERE.parent / "live_test_config.json"
 _KEYVAULT_NAME = "Slack-AI-assistant-KV"
 
 # Key Vault secret names
-_SECRET_BOT_TOKEN = "Bot-token-SB"
-_SECRET_USER_TOKEN = "User-token-SB"
-_SECRET_SCIM_TOKEN = "User-token-SB"
+_SECRET_BOT_TOKEN = "Bot-token-TEST"
+_SECRET_USER_TOKEN = "User-token-TEST"
+_SECRET_SCIM_TOKEN = "User-token-TEST"
 
 
 # ---------------------------------------------------------------------------
