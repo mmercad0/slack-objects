@@ -2,7 +2,7 @@
 
 A focused Python package for working with **Slack objects** commonly used in administration and automation workflows.
 
-`slack-objects` provides **opinionated, testable wrappers** around the Slack Web API, Admin API, and SCIM API—favoring object-based access over raw endpoint calls.
+`slack-objects` provides **opinionated, testable wrappers** around the Slack Web API, Admin API, SCIM API, and Discovery API—favoring object-based access over raw endpoint calls.
 
 ---
 
@@ -34,7 +34,7 @@ Instead, it focuses on higher-level object operations that typically require:
 - multiple API calls
 - pagination
 - rate limiting
-- Admin API or SCIM usage
+- Admin API, SCIM, or Discovery API usage
 - non-trivial orchestration logic
 
 ---
@@ -52,7 +52,7 @@ cfg = SlackObjectsConfig(
     bot_token="xoxb-...",
     user_token="xoxp-...",
     scim_token="xoxp-...",
-    # see SlackObjectsConfig for additional options (scim_base_url, http_timeout_seconds, etc.)
+    # see SlackObjectsConfig for additional options (team_id, scim_base_url, http_timeout_seconds, etc.)
 )
 
 slack = SlackObjectsClient(cfg)
@@ -118,6 +118,8 @@ The codebase is designed to be tested **without hitting Slack**.
 
 ## Installation
 
+Requires **Python 3.9+**.
+
 ```bash
 pip install slack-objects
 ```
@@ -133,7 +135,8 @@ cfg = SlackObjectsConfig(
     bot_token="xoxb-...",
     user_token="xoxp-...",
     scim_token="xoxp-...",
-    default_rate_tier=RateTier.TIER_3,  # fallback sleep between API calls when no specific tier matches
+    team_id="T0123ABC",                 # workspace ID; required for org-wide tokens calling workspace-scoped Web APIs
+    default_rate_tier=RateTier.TIER_2,  # fallback sleep between API calls when no specific tier matches (default)
 )
 ```
 
@@ -154,10 +157,23 @@ python -m tests.Smoke.run_all_smoke
 
 ---
 
+## Rate Limiting
+All Slack Web/Admin API calls go through `SlackApiCaller`, which:
+
+- Sleeps according to the resolved rate tier after every successful call
+- Automatically retries on HTTP **429** (rate-limited) responses up to **5 times**, respecting the `Retry-After` header
+
+Rate tiers are resolved in priority order:
+explicit per-call tier → method-specific override → prefix rule → `default_rate_tier` from config.
+
+---
+
 ## Notes
 
 - SCIM v2 is the default; v1 is supported where applicable
-- `PC_Utils` is an optional dependency (used for datetime handling in `set_guest_expiration_date`)
+- `PC_Utils` is a required dependency (used for datetime handling in `set_guest_expiration_date`)
 - This package is intended for automation and administration workflows
 - `resolve_user_id` accepts flexible identifiers (user ID, email, or @username) and verifies existence via Web API + SCIM fallback
 - `is_user_authorized` supports IdP-group-based authorization checks with configurable read/write access levels
+- SCIM user operations are available on `Users`: create, deactivate, reactivate, update attributes, update email, and convert to multi-channel guest
+- Discovery API is used for `Users.get_channels` and `Conversations.get_members` (requires appropriate token scopes)
