@@ -153,7 +153,8 @@ class TestScimUpdateEmail:
                 user_id=ctx.deactivated_user_id,
                 new_email="should-not-apply@example.com",
             )
-            assert not resp.ok, f"Expected failure for deactivated user, got: {resp.data}"
-        except requests.HTTPError:
-            pass  # acceptable — Slack rejected the request
+        except requests.HTTPError as exc:
+            assert exc.response.status_code in (400, 403, 404), (
+                f"Unexpected status for deactivated user: {exc.response.status_code}"
+            )
         _pause()
