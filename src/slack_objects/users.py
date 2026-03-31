@@ -626,12 +626,20 @@ class Users(ScimMixin, SlackObjectBase):
     def scim_update_user_attribute(
         self,
         *,
-        user_id: str,
+        user_id: Optional[str] = None,
         attribute: str,
         new_value: Any,
     ) -> ScimResponse:
-        """SCIM PATCH Users/<id>"""
-        validate_scim_id(user_id, "user_id")
+        """SCIM PATCH Users/<id> for simple scalar attributes.
+
+        For email updates, use :meth:`scim_update_email` instead — it handles
+        the version-specific payload formatting needed to avoid multi-primary
+        conflicts.
+        """
+        uid = user_id or self.user_id
+        if not uid:
+            raise ValueError("scim_update_user_attribute requires user_id (passed or bound)")
+        validate_scim_id(uid, "user_id")
 
         scim_version = self.cfg.scim_version
         if scim_version == "v2":
@@ -644,7 +652,7 @@ class Users(ScimMixin, SlackObjectBase):
         else:
             raise NotImplementedError(f"Invalid SCIM version: {scim_version}")
 
-        return self._scim_request(path=f"Users/{user_id}", method="PATCH", payload=payload)
+        return self._scim_request(path=f"Users/{uid}", method="PATCH", payload=payload)
 
     def scim_update_email(
         self,

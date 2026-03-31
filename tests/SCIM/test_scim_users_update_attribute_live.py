@@ -190,6 +190,21 @@ class TestScimUpdateUserAttribute:
         )
         _pause()
 
+    # ----- bound user_id (no explicit user_id) -----
+
+    def test_update_attribute_bound_user(self, ctx, users):
+        """Update attribute using bound user_id (no explicit user_id arg)."""
+        bound = users.with_user(ctx.active_member_id)
+        resp = bound.scim_update_user_attribute(
+            attribute="title",
+            new_value="Bound Test Title",
+        )
+        assert resp.ok, f"Expected ok for bound user: {resp.data}"
+        _pause()
+
+        bound.scim_update_user_attribute(attribute="title", new_value="")
+        _pause()
+
     # ----- deactivated user -----
 
     def test_update_attribute_deactivated_user(self, ctx, users):

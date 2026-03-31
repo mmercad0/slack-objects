@@ -110,17 +110,18 @@ def main() -> None:
         CallSpec("get_user_id_from_email(miss)", lambda: users.get_user_id_from_email("missing@example.com")),
 
         # Profile helpers
-        CallSpec("get_user_profile(bound)", lambda: bound.get_user_profile()),
+        CallSpec("get_user_profile()", lambda: bound.get_user_profile()),
         CallSpec("get_user_profile(by id)", lambda: users.get_user_profile("U1")),
-        CallSpec("set_user_profile_field(bound)", lambda: bound.set_user_profile_field("status_text", "hello")),
+        CallSpec("set_user_profile_field()", lambda: bound.set_user_profile_field("status_text", "hello")),
         CallSpec("set_user_profile_field(by id)", lambda: users.set_user_profile_field("status_text", "hello", user_id="U1")),
 
         # Classification helpers (need attributes)
         CallSpec("is_contingent_worker()", lambda: (_refresh_bound(), bound.is_contingent_worker())),
         CallSpec("is_guest()", lambda: (_refresh_bound(), bound.is_guest())),
         CallSpec("is_active()", lambda: (_refresh_bound(), bound.is_active())),
-        CallSpec("is_active(user_id override)", lambda: (_refresh_bound(), bound.is_active(user_id="U2"))),
+        CallSpec("is_active(by id)", lambda: (_refresh_bound(), bound.is_active(user_id="U2"))),
         CallSpec("is_active_scim()", lambda: bound.is_active_scim()),
+        CallSpec("is_active_scim(by id)", lambda: bound.is_active_scim(user_id="U1")),
 
         # Admin helpers
         CallSpec(
@@ -128,6 +129,7 @@ def main() -> None:
             lambda: bound.invite_user(channel_ids=["C1", "C2"], email="new@example.com", team_id="T1"),
         ),
         CallSpec("wipe_all_sessions()", lambda: bound.wipe_all_sessions()),
+        CallSpec("wipe_all_sessions(by id)", lambda: bound.wipe_all_sessions(user_id="U1")),
         CallSpec("add_to_workspace()", lambda: bound.add_to_workspace("U1", "T1")),
         CallSpec("remove_from_workspace()", lambda: bound.remove_from_workspace("U1", "T1")),
         CallSpec("add_to_conversation()", lambda: bound.add_to_conversation(["U1"], "C1")),
@@ -152,24 +154,34 @@ def main() -> None:
             "set_guest_expiration_date()",
             lambda: bound.set_guest_expiration_date("2030-01-01", workspace_id="T1"),
         ),
+        CallSpec(
+            "set_guest_expiration_date(by id)",
+            lambda: bound.set_guest_expiration_date("2030-01-01", user_id="U1", workspace_id="T1"),
+        ),
 
         # SCIM helpers (scim_version now comes from cfg, not a kwarg)
         CallSpec("scim_create_user()", lambda: bound.scim_create_user("testuser", "test@example.com")),
         CallSpec("scim_deactivate_user()", lambda: bound.scim_deactivate_user("U1")),
         CallSpec("scim_reactivate_user()", lambda: bound.scim_reactivate_user()),
+        CallSpec("scim_reactivate_user(by id)", lambda: bound.scim_reactivate_user(user_id="U1")),
+        CallSpec(
+            "scim_update_user_attribute(by id)",
+            lambda: bound.scim_update_user_attribute(user_id="U1", attribute="active", new_value=False),
+        ),
         CallSpec(
             "scim_update_user_attribute()",
-            lambda: bound.scim_update_user_attribute(user_id="U1", attribute="active", new_value=False),
+            lambda: bound.scim_update_user_attribute(attribute="active", new_value=False),
         ),
         CallSpec(
             "scim_update_email(by id)",
             lambda: bound.scim_update_email(user_id="U1", new_email="newemail@example.com"),
         ),
         CallSpec(
-            "scim_update_email(bound)",
+            "scim_update_email()",
             lambda: bound.scim_update_email(new_email="newemail@example.com"),
         ),
         CallSpec("make_multi_channel_guest()", lambda: bound.make_multi_channel_guest()),
+        CallSpec("make_multi_channel_guest(by id)", lambda: bound.make_multi_channel_guest(user_id="U1")),
 
         # SCIM search primitives
         CallSpec("scim_search_user_by_email()", lambda: bound.scim_search_user_by_email("test@example.com")),
