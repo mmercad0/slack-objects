@@ -311,20 +311,31 @@ class TestGetChannels:
         assert isinstance(result, list)
         _pause()
 
-    def test_active_only_true_subset_of_all(self, ctx, users):
-        """active_only=True should return ≤ active_only=False."""
-        active = users.get_channels(ctx.active_member_id, active_only=True)
+    def test_current_only_subset_of_including_left(self, ctx, users):
+        """Default (current only) should return ≤ include_channels_user_left=True."""
+        current = users.get_channels(ctx.active_member_id)
         _pause()
-        all_ch = users.get_channels(ctx.active_member_id, active_only=False)
+        including_left = users.get_channels(ctx.active_member_id, include_channels_user_left=True)
         _pause()
-        assert len(active) <= len(all_ch), (
-            f"active_only ({len(active)}) should be ≤ all ({len(all_ch)})"
+        assert len(current) <= len(including_left), (
+            f"current only ({len(current)}) should be ≤ including left ({len(including_left)})"
         )
 
-    def test_active_only_false_returns_list(self, ctx, users):
-        """active_only=False should still return a list."""
-        result = users.get_channels(ctx.active_member_id, active_only=False)
+    def test_including_left_returns_list(self, ctx, users):
+        """include_channels_user_left=True should still return a list."""
+        result = users.get_channels(ctx.active_member_id, include_channels_user_left=True)
         assert isinstance(result, list)
+        _pause()
+
+    def test_default_excludes_left_channels(self, ctx, users):
+        """Default call must not return channels the user has left.
+
+        Guards the regression where include_historical was never sent: the flag
+        controls the request, so a default call should contain no date_left != 0.
+        """
+        result = users.get_channels(ctx.active_member_id)
+        left = [c for c in result if c.get("date_left", 0) != 0]
+        assert not left, f"Default call returned {len(left)} channel(s) the user left"
         _pause()
 
 

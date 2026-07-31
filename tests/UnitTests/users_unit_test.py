@@ -663,3 +663,175 @@ class TestScimUpdateUserAttribute:
         users = _make_users()
         with pytest.raises(ValueError):
             users.scim_update_user_attribute(user_id="", attribute="active", new_value=False)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# get_channels (discovery.user.conversations)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class FakeDiscoveryWebClient:
+    """Fake discovery.user.conversations that honors include_historical.
+
+    Mirrors real Slack behavior confirmed against the Discovery API: channels the
+    user has left are returned ONLY when include_historical is truthy. The Slack
+    SDK serializes booleans to "0"/"1", so this accepts both forms.
+
+    Also records every payload it receives so tests can assert on the request.
+    """
+
+    CURRENT = [
+        {"id": "C001", "date_joined": 1665776256, "date_left": 0},
+        {"id": "C002", "date_joined": 1665776257, "date_left": 0},
+    ]
+    LEFT = [
+        {"id": "C900", "date_joined": 1665776258, "date_left": 1700000000},
+    ]
+
+    def __init__(self, paginate: bool = False):
+        self.payloads: list = []
+        self.paginate = paginate
+
+    @staticmethod
+    def _is_truthy(value) -> bool:
+        # Accept True, "1", and 1; the SDK converts booleans to "0"/"1".
+        return value in (True, 1, "1")
+
+    def api_call(self, method: str, json=None, params=None):
+        payload = json if json is not None else (params or {})
+
+        if method != "discovery.user.conversations":
+            return {"ok": True}
+
+        self.payloads.append(dict(payload))
+
+        include_historical = self._is_truthy(payload.get("include_historical"))
+        channels = list(self.CURRENT)
+        if include_historical:
+            channels += self.LEFT
+
+        # Emit two pages on the first call when pagination is being exercised.
+        if self.paginate and "offset" not in payload:
+            return {"ok": True, "channels": channels, "offset": "page2"}
+
+        return {"ok": True, "channels": channels}
+
+
+class FakeDiscoveryErrorWebClient:
+    """Fake that always fails, to exercise the legacy error-list behavior."""
+
+    def api_call(self, method: str, json=None, params=None):
+        if method == "discovery.user.conversations":
+            return {"ok": False, "error": "user_not_found"}
+        return {"ok": True}
+
+
+def _make_users_with_client(web_client):
+    """Helper: build a Users instance wired to a specific fake web client."""
+    cfg = SlackObjectsConfig(
+        bot_token="xoxb-fake",
+        user_token="xoxp-fake",
+        scim_token="xoxp-fake",
+        default_rate_tier=RateTier.TIER_3,
+    )
+    slack = SlackObjectsClient(cfg, logger=logging.getLogger("test"))
+    slack.web_client = web_client
+    slack.api = FakeApiCaller(cfg)
+    slack._users = None
+    return slack.users()
+
+
+class TestGetChannels:
+    """get_channels — include_channels_user_left controls the request, not just filtering."""
+
+    def test_default_does_not_request_historical(self):
+        """Default call must send include_historical=False.
+
+        This is the efficiency guarantee: the common case should not make Slack
+        return channels the user left only for them to be filtered out locally.
+        """
+        fake = FakeDiscoveryWebClient()
+        users = _make_users_with_client(fake)
+
+        users.get_channels("U1")
+
+        assert fake.payloads[0]["include_historical"] is False
+
+    def test_include_left_requests_historical(self):
+        """include_channels_user_left=True must send include_historical=True."""
+        fake = FakeDiscoveryWebClient()
+        users = _make_users_with_client(fake)
+
+        users.get_channels("U1", include_channels_user_left=True)
+
+        assert fake.payloads[0]["include_historical"] is True
+
+    def test_default_returns_only_current_channels(self):
+        """Default call returns just the channels the user is still in."""
+        users = _make_users_with_client(FakeDiscoveryWebClient())
+
+        result = users.get_channels("U1")
+
+        assert [c["id"] for c in result] == ["C001", "C002"]
+
+    def test_include_left_returns_current_and_left(self):
+        """include_channels_user_left=True returns left channels too."""
+        users = _make_users_with_client(FakeDiscoveryWebClient())
+
+        result = users.get_channels("U1", include_channels_user_left=True)
+
+        assert [c["id"] for c in result] == ["C001", "C002", "C900"]
+
+    def test_include_left_returns_more_than_default(self):
+        """The two modes must not return identical data (the original bug)."""
+        users = _make_users_with_client(FakeDiscoveryWebClient())
+
+        current = users.get_channels("U1")
+        including_left = users.get_channels("U1", include_channels_user_left=True)
+
+        assert len(including_left) > len(current)
+
+    def test_request_includes_user_and_limit(self):
+        """Payload keeps the documented user/limit parameters."""
+        fake = FakeDiscoveryWebClient()
+        users = _make_users_with_client(fake)
+
+        users.get_channels("U1")
+
+        assert fake.payloads[0]["user"] == "U1"
+        assert fake.payloads[0]["limit"] == 1000
+
+    def test_pagination_follows_offset(self):
+        """An offset in the response triggers another call and results accumulate."""
+        fake = FakeDiscoveryWebClient(paginate=True)
+        users = _make_users_with_client(fake)
+
+        result = users.get_channels("U1")
+
+        assert len(fake.payloads) == 2
+        assert fake.payloads[1]["offset"] == "page2"
+        assert len(result) == 4  # two current channels per page
+
+    def test_pagination_preserves_historical_flag(self):
+        """include_historical must persist across paginated requests."""
+        fake = FakeDiscoveryWebClient(paginate=True)
+        users = _make_users_with_client(fake)
+
+        users.get_channels("U1", include_channels_user_left=True)
+
+        assert all(p["include_historical"] is True for p in fake.payloads)
+
+    def test_api_error_returns_error_list(self):
+        """Legacy behavior: API failures come back as a list of error dicts."""
+        users = _make_users_with_client(FakeDiscoveryErrorWebClient())
+
+        result = users.get_channels("U1")
+
+        assert isinstance(result, list)
+        assert result[0]["message"] == "user_not_found"
+
+    def test_active_only_no_longer_accepted(self):
+        """The old active_only parameter was replaced and must not silently work."""
+        users = _make_users_with_client(FakeDiscoveryWebClient())
+
+        with pytest.raises(TypeError):
+            users.get_channels("U1", active_only=False)

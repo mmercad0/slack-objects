@@ -136,8 +136,8 @@ def main() -> None:
         CallSpec("remove_from_conversation()", lambda: bound.remove_from_conversation("U1", "C1")),
 
         # Discovery helper
-        CallSpec("get_channels(active_only)", lambda: bound.get_channels("U1", active_only=True)),
-        CallSpec("get_channels(all)", lambda: bound.get_channels("U1", active_only=False)),
+        CallSpec("get_channels(current only)", lambda: bound.get_channels("U1")),
+        CallSpec("get_channels(including left)", lambda: bound.get_channels("U1", include_channels_user_left=True)),
 
         # Authorization helper
         CallSpec(

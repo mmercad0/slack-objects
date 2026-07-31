@@ -177,3 +177,4 @@ explicit per-call tier → method-specific override → prefix rule → `default
 - `is_user_authorized` supports IdP-group-based authorization checks with configurable read/write access levels
 - SCIM user operations are available on `Users`: create, deactivate, reactivate, update attributes, update email, and convert to multi-channel guest
 - Discovery API is used for `Users.get_channels` and `Conversations.get_members` (requires appropriate token scopes)
+- `Users.get_channels(include_channels_user_left=True)` and `Conversations.get_members(include_members_who_left=True)` opt into historical data; both default to `False` so the common case makes fewer paginated calls

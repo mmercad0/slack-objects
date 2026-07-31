@@ -404,19 +404,39 @@ class Users(ScimMixin, SlackObjectBase):
 
     # ---------- discovery helper ----------
 
-    def get_channels(self, user_id: str, active_only: bool = True) -> List[Dict[str, Any]]:
+    def get_channels(self, user_id: str, include_channels_user_left: bool = False) -> List[Dict[str, Any]]:
         """
         discovery.user.conversations, paginated by offset.
 
+        Args:
+            user_id: The Slack user whose conversations should be listed.
+            include_channels_user_left: When True, also return channels the user
+                has left (those with a non-zero ``date_left``). Mirrors
+                ``Conversations.get_members(include_members_who_left=...)``.
+
+        Note:
+            Slack only returns channels the user has left when ``include_historical``
+            is sent, so this flag controls the *request* and not just local filtering.
+            Leaving it False keeps the common case cheaper: Slack returns fewer
+            channels, which also means fewer paginated calls.
+
         Returns:
             - If errors occur: a list of error dicts (legacy behavior preserved)
-            - Else: list of channels (active_only controls whether it filters to channels with date_left == 0)
+            - Else: the user's channels, including left channels only when
+              ``include_channels_user_left`` is True
         """
         current_channels: List[Dict[str, Any]] = []
         all_channels: List[Dict[str, Any]] = []
         errors: List[Dict[str, Any]] = []
 
-        payload: Dict[str, Any] = {"user": user_id, "limit": 1000}
+        payload: Dict[str, Any] = {
+            "user": user_id,
+            "limit": 1000,
+            # Sent explicitly in both states so the behavior does not depend on
+            # Slack's server-side default. The Slack SDK serializes booleans to
+            # "0"/"1", so False is transmitted correctly.
+            "include_historical": include_channels_user_left,
+        }
 
         while True:
             resp = self._discovery_user_conversations(payload)
@@ -428,6 +448,7 @@ class Users(ScimMixin, SlackObjectBase):
             channels = resp.get("channels") or []
             for ch in channels:
                 all_channels.append(ch)
+                # date_left is 0 for channels the user is still a member of.
                 if ch.get("date_left", 0) == 0:
                     current_channels.append(ch)
 
@@ -440,7 +461,9 @@ class Users(ScimMixin, SlackObjectBase):
         if errors:
             return errors  # preserve legacy behavior
 
-        return current_channels if active_only else all_channels
+        # The filter is a safety net: when include_historical is False Slack
+        # should not return left channels in the first place.
+        return all_channels if include_channels_user_left else current_channels
 
     # ============================================================
     # SCIM public methods (use inherited ScimMixin._scim_request)
