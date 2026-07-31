@@ -18,7 +18,7 @@ class SlackObjectsClient:
     Owns config, Slack client, and rate-limited API caller.
     """
 
-    def __init__(self, cfg: SlackObjectsConfig, logger: logging.Logger | None = None):
+    def __init__(self, cfg: SlackObjectsConfig, logger: Optional[logging.Logger] = None):
         self.cfg = cfg
         self.logger = logger or logging.getLogger("slack-objects")
 
