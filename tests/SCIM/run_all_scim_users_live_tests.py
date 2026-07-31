@@ -49,7 +49,8 @@ def main() -> int:
         print(f"{'═' * 70}\n")
 
         rc = subprocess.call(
-            [sys.executable, "-m", "pytest", str(filepath), *extra_args],
+            # '-m live' re-enables the live tier, which pytest.ini deselects by default.
+            [sys.executable, "-m", "pytest", "-m", "live", str(filepath), *extra_args],
             cwd=str(_HERE.parent.parent),  # workspace root
         )
         results[filename] = rc
