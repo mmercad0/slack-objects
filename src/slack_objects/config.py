@@ -10,7 +10,9 @@ USER_ID_RE = re.compile(r"^[UW][A-Z0-9]+$")
 CONVERSATION_ID_RE = re.compile(r"^[CGD][A-Z0-9]+$")
 
 # Lightweight email pattern (not RFC 5322, but catches obvious non-emails).
-EMAIL_RE = re.compile(r"^[\w.\-]+@[\w.\-]+\.\w+$")
+# The local part allows "+" so plus-addressing (user+tag@example.com) validates;
+# "+" precedes "\-" in the character class so it is not read as a range.
+EMAIL_RE = re.compile(r"^[\w.+\-]+@[\w.\-]+\.\w+$")
 
 
 class RateTier(float, Enum):

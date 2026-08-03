@@ -69,11 +69,23 @@ class TestConversationIdRegex:
 class TestEmailRegex:
     """EMAIL_RE — lightweight email validation."""
 
-    @pytest.mark.parametrize("valid", ["user@example.com", "a.b-c@sub.domain.org"])
+    @pytest.mark.parametrize(
+        "valid",
+        [
+            "user@example.com",
+            "a.b-c@sub.domain.org",
+            # Plus-addressing is common for Slack accounts and must validate.
+            "user+tag@company.com",
+            "bob.smith+tag@sub.example.co.uk",
+        ],
+    )
     def test_valid_emails(self, valid):
         assert EMAIL_RE.match(valid)
 
-    @pytest.mark.parametrize("invalid", ["", "noatsign", "@no-local.com", "user@", "user@.com"])
+    @pytest.mark.parametrize(
+        "invalid",
+        ["", "noatsign", "@no-local.com", "user@", "user@.com", "user+@", "user+tag@nodot"],
+    )
     def test_invalid_emails(self, invalid):
         assert not EMAIL_RE.match(invalid)
 
