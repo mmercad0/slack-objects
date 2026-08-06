@@ -225,6 +225,134 @@ def test_get_members_and_is_member_with_bound_group():
     assert bound.is_member("U999") is False
 
 
+def test_get_group_returns_full_record_in_one_call():
+    """
+    Verifies:
+    - get_group() returns the complete SCIM payload (not just members)
+    - a single GET Groups/{id} serves both displayName and members
+    """
+    from slack_objects.idp_groups import IDP_groups
+
+    cfg = DummyConfig()
+    base = _scim_base(cfg, "v1")
+
+    group_payload = {
+        "id": "S123",
+        "displayName": "Admins",
+        "meta": {"created": "2024-01-01T00:00:00Z"},
+        "members": [{"value": "U111", "display": "Alice"}],
+    }
+
+    sess = FakeScimSession({("GET", f"{base}Groups/S123"): (200, group_payload)})
+
+    idp = IDP_groups(cfg=cfg, client=DummySlackClient(), logger=logging.getLogger("test"), api=DummyApiCaller(), scim_session=sess)
+    idp.rate_policy = RateLimitPolicy(method_overrides={}, prefix_rules={}, default=0.0)
+
+    group = idp.get_group("S123")
+
+    assert group["displayName"] == "Admins"
+    assert group["members"] == group_payload["members"]
+    # Unmapped fields stay reachable, which is why the full payload is returned.
+    assert group["meta"]["created"] == "2024-01-01T00:00:00Z"
+    assert len(sess.calls) == 1
+
+
+def test_bound_properties_load_lazily_and_share_one_call():
+    """
+    Verifies:
+    - binding a group_id performs no API call
+    - display_name triggers the fetch, and members reuses the cached response
+    """
+    from slack_objects.idp_groups import IDP_groups
+
+    cfg = DummyConfig()
+    base = _scim_base(cfg, "v1")
+
+    group_payload = {
+        "id": "S123",
+        "displayName": "Admins",
+        "members": [{"value": "U111", "display": "Alice"}],
+    }
+
+    sess = FakeScimSession({("GET", f"{base}Groups/S123"): (200, group_payload)})
+
+    group = IDP_groups(cfg=cfg, client=DummySlackClient(), logger=logging.getLogger("test"), api=DummyApiCaller(), scim_session=sess, group_id="S123")
+    group.rate_policy = RateLimitPolicy(method_overrides={}, prefix_rules={}, default=0.0)
+
+    # Construction must not perform network I/O.
+    assert sess.calls == []
+
+    assert group.display_name == "Admins"
+    assert group.members == group_payload["members"]
+    # get_members() must reuse the cache rather than issue a second request.
+    assert group.get_members() == group_payload["members"]
+    assert len(sess.calls) == 1
+
+
+def test_properties_require_a_bound_group_id():
+    """An unbound instance cannot lazily load, and must say so clearly."""
+    from slack_objects.idp_groups import IDP_groups
+
+    cfg = DummyConfig()
+    sess = FakeScimSession({})
+
+    idp = IDP_groups(cfg=cfg, client=DummySlackClient(), logger=logging.getLogger("test"), api=DummyApiCaller(), scim_session=sess)
+    idp.rate_policy = RateLimitPolicy(method_overrides={}, prefix_rules={}, default=0.0)
+
+    try:
+        idp.display_name
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("display_name should raise ValueError when no group_id is bound")
+
+    assert sess.calls == []
+
+
+def test_get_group_merges_paginated_members():
+    """
+    Verifies:
+    - when totalResults exceeds the members returned, remaining pages are fetched
+    - members from all pages are merged, so large groups are not truncated
+    """
+    from slack_objects.idp_groups import IDP_groups
+
+    cfg = DummyConfig()
+
+    page1 = {
+        "id": "S123",
+        "displayName": "Admins",
+        "totalResults": 3,
+        "members": [{"value": "U111", "display": "Alice"}, {"value": "U222", "display": "Bob"}],
+    }
+    page2 = {
+        "id": "S123",
+        "displayName": "Admins",
+        "totalResults": 3,
+        "members": [{"value": "U333", "display": "Carol"}],
+    }
+
+    sess = FakeScimSession({})
+
+    calls = []
+
+    def request_side_effect(method: str, url: str, **kwargs):
+        calls.append(kwargs.get("params"))
+        return FakeResponse(200, page1 if len(calls) == 1 else page2)
+
+    sess.request = request_side_effect  # type: ignore[method-assign]
+
+    idp = IDP_groups(cfg=cfg, client=DummySlackClient(), logger=logging.getLogger("test"), api=DummyApiCaller(), scim_session=sess)
+    idp.rate_policy = RateLimitPolicy(method_overrides={}, prefix_rules={}, default=0.0)
+
+    group = idp.get_group("S123", fetch_count=2)
+
+    assert [m["value"] for m in group["members"]] == ["U111", "U222", "U333"]
+    # First call is the plain legacy request; the second resumes after what we already have.
+    assert calls[0] is None
+    assert calls[1]["startIndex"] == 3
+
+
 # -----------------------------
 # Optional "factory-style" demo
 # -----------------------------

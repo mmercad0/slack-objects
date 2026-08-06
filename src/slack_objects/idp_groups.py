@@ -12,6 +12,7 @@ Manage Identity Provider (IdP) groups synced into Slack via SCIM.
 This module implements the following functionality:
 
 - list groups (paginated)
+- get a single group's full SCIM record (name, members, metadata)
 - get members of a given group
 - check whether a user is a member of a group
 
@@ -20,6 +21,11 @@ Design decisions
 - SCIM REST calls are centralized in ScimMixin._scim_request(); all public methods call endpoint wrappers.
 - Uses an injectable `requests.Session` (`scim_session`) so tests can pass a fake session.
 - Keeps legacy output shapes: lists of dicts for groups and members.
+- ``get_group()`` is the single read path for GET Groups/{id}; ``get_members()``,
+  ``is_member()`` and the ``display_name``/``members`` properties all compose on it
+  so the endpoint is only ever called from one place.
+- Attributes are loaded lazily (like ``Users``): binding a group_id does no network I/O,
+  the fetch happens on first property access or on ``refresh()``.
 - This module is SCIM-only. For Slack-native usergroups, see ``usergroups.py``.
 """
 
@@ -42,9 +48,18 @@ class IDP_groups(ScimMixin, SlackObjectBase):
         idp = slack.idp_groups()          # unbound
         bound = slack.idp_groups("S123")  # bound to a group_id
 
+    Binding a group_id performs no API call. `attributes` are loaded lazily via
+    `_require_attributes()` on first property access, so a single GET Groups/{id}
+    serves both the name and the members:
+
+        group = slack.idp_groups("S123")
+        name = group.display_name   # triggers the fetch
+        members = group.members     # served from the same cached response
+
     The SCIM session can be replaced for unit tests by passing scim_session argument.
     """
     group_id: Optional[str] = None
+    attributes: Dict[str, Any] = field(default_factory=dict)
     scim_session: requests.Session = field(default_factory=requests.Session, repr=False)
 
     # ---------- factory ----------
@@ -68,6 +83,41 @@ class IDP_groups(ScimMixin, SlackObjectBase):
             raise ValueError("group_id is required (passed or bound)")
         return gid
 
+    # ---------- lazily loaded attributes ----------
+
+    def refresh(self, group_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Refresh cached attributes for group_id (or self.group_id) using GET Groups/{id}.
+
+        Layered like ``Users.refresh()``: it calls the public ``get_group()``, which
+        calls the endpoint wrapper.
+        """
+        if group_id:
+            self.group_id = group_id
+        if not self.group_id:
+            raise ValueError("refresh() requires group_id (passed or already set)")
+
+        self.attributes = self.get_group(self.group_id)
+        return self.attributes
+
+    def _require_attributes(self) -> Dict[str, Any]:
+        """Ensure attributes are loaded (via refresh) before using helpers that read group fields."""
+        if self.attributes:
+            return self.attributes
+        if self.group_id:
+            return self.refresh()
+        raise ValueError("Group attributes not loaded and no group_id set (call refresh() or bind a group_id).")
+
+    @property
+    def display_name(self) -> str:
+        """The group's SCIM ``displayName`` (loaded lazily)."""
+        return self._require_attributes().get("displayName", "")
+
+    @property
+    def members(self) -> List[Dict[str, str]]:
+        """The group's members as ``{'value': <user id>, 'display': <name>}`` dicts (loaded lazily)."""
+        return self._require_attributes().get("members", []) or []
+
     # ---------- endpoint wrappers (only these call _scim_request) ----------
 
     def _scim_groups_list(self, *, count: int = 1000, start_index: Optional[int] = None) -> ScimResponse:
@@ -80,10 +130,21 @@ class IDP_groups(ScimMixin, SlackObjectBase):
             params["startIndex"] = start_index
         return self._scim_request(path="Groups", method="GET", params=params)   # https://docs.slack.dev/reference/scim-api/#get-groups
 
-    def _scim_group_get(self, group_id: str) -> ScimResponse:
-        """Wrapper for GET Groups/{id}"""
+    def _scim_group_get(self, group_id: str, *, count: Optional[int] = None, start_index: Optional[int] = None) -> ScimResponse:
+        """
+        Wrapper for GET Groups/{id}.
+
+        count/start_index page over the group's *members* sub-list, which matters for
+        groups larger than the server-side page size.
+        """
         validate_scim_id(group_id, "group_id")
-        return self._scim_request(path=f"Groups/{group_id}", method="GET")      # https://docs.slack.dev/reference/scim-api/#get-groups-id
+        params: Dict[str, Any] = {}
+        if count is not None:
+            params["count"] = count
+        if start_index is not None:
+            params["startIndex"] = start_index
+        # Pass params only when set, so the default call is byte-for-byte the legacy request.
+        return self._scim_request(path=f"Groups/{group_id}", method="GET", params=params or None)      # https://docs.slack.dev/reference/scim-api/#get-groups-id
 
     # ---------- public helpers ----------
 
@@ -130,16 +191,60 @@ class IDP_groups(ScimMixin, SlackObjectBase):
 
         return groups_out
 
+    def get_group(self, group_id: Optional[str] = None, *, fetch_count: int = 1000) -> Dict[str, Any]:
+        """
+        Return the full SCIM record for a single group (GET Groups/{id}).
+
+        One call yields both ``displayName`` and ``members``, so callers that need
+        the name do not have to pay for a second request. The complete payload is
+        returned (``id``, ``displayName``, ``members``, ``meta``, ``schemas``, ...) so
+        new SCIM fields are reachable without adding a method here.
+
+        When the response reports a ``totalResults`` larger than the members returned,
+        the remaining member pages are fetched and merged, so large groups are not
+        silently truncated.
+
+        Raises:
+            requests.HTTPError on non-2xx responses.
+        """
+        gid = self._resolve_group_id(group_id)
+
+        # First request sends no pagination params, so it is identical to the legacy call.
+        # Copy so callers mutating the result cannot corrupt our cached attributes.
+        group = dict(self._scim_group_get(gid).data)
+        members: List[Dict[str, str]] = list(group.get("members") or [])
+
+        # totalResults is only present when the server actually paged the members;
+        # when it is absent the single response is complete and we skip the loop.
+        total_results = group.get("totalResults")
+        if total_results is not None:
+            while len(members) < int(total_results):
+                # SCIM startIndex is 1-based, and the server chooses the first page size,
+                # so derive the cursor from what we already have rather than from fetch_count.
+                start_index = len(members) + 1
+                page_members = self._scim_group_get(gid, count=fetch_count, start_index=start_index).data.get("members") or []
+                # An empty page means the server has nothing more; stop rather than loop forever.
+                if not page_members:
+                    break
+                members.extend(page_members)
+
+        group["members"] = members
+        return group
+
     def get_members(self, group_id: Optional[str] = None) -> List[Dict[str, str]]:
         """
         Return group members via SCIM (GET Groups/{id}) as a list of dicts `{'value': <user_id>, 'display': <name>}`.
+
+        Composes on ``get_group()``; the cached attributes are reused when they already
+        describe the requested group, so property access and this method share one call.
 
         This module is SCIM-only. For Slack-native usergroups, see
         ``Usergroups.get_members()`` in ``usergroups.py``.
         """
         gid = self._resolve_group_id(group_id)
-        scim_resp = self._scim_group_get(gid)
-        return scim_resp.data.get("members", [])
+        if self.attributes and self.attributes.get("id") == gid:
+            return self.attributes.get("members", []) or []
+        return self.get_group(gid).get("members", []) or []
 
     def is_member(self, user_id: str, group_id: Optional[str] = None) -> bool:
         """
@@ -147,6 +252,9 @@ class IDP_groups(ScimMixin, SlackObjectBase):
 
         Higher-level convenience that composes on ``get_members()``.
         Preserves legacy semantics (scans the members list).
+
+        Each call fetches the group unless its attributes are already cached, so when
+        testing many users bind the group once (or hoist ``get_members()`` out of the loop).
         """
         members = self.get_members(group_id=group_id)
         for member in members:
