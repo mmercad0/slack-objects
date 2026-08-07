@@ -3,6 +3,12 @@ name: Publish to TestPyPI
 on:
   release:
     types: [prereleased]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build and publish to TestPyPI (e.g. v0.4.0-rc1). Run this from the default branch."
+        required: true
+        type: string
 
 jobs:
   build-and-publish:
@@ -19,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
 
       - uses: actions/setup-python@v5
         with:
