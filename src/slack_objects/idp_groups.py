@@ -25,6 +25,8 @@ Design decisions
 - ``get_group()`` is the single read path for GET Groups/{id}; ``get_members()``,
   ``is_member()`` and the ``display_name``/``members`` properties all compose on it
   so the endpoint is only ever called from one place.
+- ``get_group()`` raises on incomplete or malformed member lists instead of returning
+  them, so callers never mistake missing data for non-membership.
 - Attributes are loaded lazily (like ``Users``): binding a group_id does no network I/O,
   the fetch happens on first property access or on ``refresh()``.
 - This module is SCIM-only. For Slack-native usergroups, see ``usergroups.py``.
@@ -244,15 +246,23 @@ class IDP_groups(ScimMixin, SlackObjectBase):
         the remaining member pages are fetched and merged, so large groups are not
         silently truncated.
 
+        The record is validated before it is returned, because a short or malformed
+        member list would otherwise look like users are not members. A missing
+        ``members`` field is treated as an empty group.
+
         Raises:
             requests.HTTPError on non-2xx responses.
+            RuntimeError when the response is for a different group, a member list is
+            malformed, or the members stop before ``totalResults``.
         """
         gid = self._resolve_group_id(group_id)
 
         # First request sends no pagination params, so it is identical to the legacy call.
         # Copy so callers mutating the result cannot corrupt our cached attributes.
         group = dict(self._scim_group_get(gid).data)
-        members: List[Dict[str, str]] = list(group.get("members") or [])
+        if group.get("id") != gid:
+            raise RuntimeError(f"SCIM GET Groups/{gid} returned a record for {group.get('id')!r}")
+        members = self._validated_members(gid, group.get("members"))
 
         # totalResults is only present when the server actually paged the members;
         # when it is absent the single response is complete and we skip the loop.
@@ -262,14 +272,30 @@ class IDP_groups(ScimMixin, SlackObjectBase):
                 # SCIM startIndex is 1-based, and the server chooses the first page size,
                 # so derive the cursor from what we already have rather than from fetch_count.
                 start_index = len(members) + 1
-                page_members = self._scim_group_get(gid, count=fetch_count, start_index=start_index).data.get("members") or []
-                # An empty page means the server has nothing more; stop rather than loop forever.
+                page = self._scim_group_get(gid, count=fetch_count, start_index=start_index).data
+                page_members = self._validated_members(gid, page.get("members"))
+                # An empty page before totalResults means the list is incomplete; raise
+                # rather than loop forever or return a list that is silently short.
                 if not page_members:
-                    break
+                    raise RuntimeError(
+                        f"Incomplete member list for group {gid}: got {len(members)} of {total_results}"
+                    )
                 members.extend(page_members)
 
         group["members"] = members
         return group
+
+    @staticmethod
+    def _validated_members(group_id: str, members: Any) -> List[Dict[str, str]]:
+        """Return a copy of a SCIM ``members`` page, raising RuntimeError if it is malformed."""
+        if members is None:
+            return []
+        if not isinstance(members, list):
+            raise RuntimeError(f"Malformed member list for group {group_id}: expected a list")
+        for member in members:
+            if not isinstance(member, dict) or not isinstance(member.get("value"), str) or not member["value"]:
+                raise RuntimeError(f"Malformed member entry for group {group_id}: {member!r}")
+        return list(members)
 
     def get_members(self, group_id: Optional[str] = None) -> List[Dict[str, str]]:
         """
@@ -295,6 +321,9 @@ class IDP_groups(ScimMixin, SlackObjectBase):
 
         Each call fetches the group unless its attributes are already cached, so when
         testing many users bind the group once (or hoist ``get_members()`` out of the loop).
+
+        Raises the same errors as ``get_group()``, so an incomplete member list is never
+        reported as "not a member".
         """
         members = self.get_members(group_id=group_id)
         for member in members:

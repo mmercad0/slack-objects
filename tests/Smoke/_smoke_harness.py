@@ -286,7 +286,10 @@ class FakeScimSession:
         # --- SCIM Groups endpoints (used by IDP_groups) ---
         # Group detail (IDP_groups.get_members / is_member)
         if "Groups/" in url:
-            return Resp({"members": [{"value": "U1", "display": "User One"}, {"value": "U2", "display": "User Two"}]})
+            return Resp({
+                "id": url.rsplit("/", 1)[-1],
+                "members": [{"value": "U1", "display": "User One"}, {"value": "U2", "display": "User Two"}],
+            })
 
         # Group list
         # SCIM startIndex is 1-based; return all in one page here

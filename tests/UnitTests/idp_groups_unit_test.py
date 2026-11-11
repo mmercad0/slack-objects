@@ -355,6 +355,53 @@ def test_get_group_merges_paginated_members():
     assert calls[1]["startIndex"] == 3
 
 
+def _group_with_pages(*pages):
+    """Return an IDP_groups whose successive GET Groups/{id} calls return *pages* in order."""
+    from slack_objects.idp_groups import IDP_groups
+
+    sess = FakeScimSession({})
+    responses = iter(pages)
+    sess.request = lambda method, url, **kwargs: FakeResponse(200, next(responses))  # type: ignore[method-assign]
+    idp = IDP_groups(cfg=DummyConfig(), client=DummySlackClient(), logger=logging.getLogger("test"), api=DummyApiCaller(), scim_session=sess)
+    idp.rate_policy = RateLimitPolicy(method_overrides={}, prefix_rules={}, default=0.0)
+    return idp
+
+
+def test_get_group_raises_when_member_pages_stop_early():
+    idp = _group_with_pages(
+        {"id": "S123", "totalResults": 3, "members": [{"value": "U111"}, {"value": "U222"}]},
+        {"id": "S123", "totalResults": 3, "members": []},
+    )
+    with pytest.raises(RuntimeError, match="Incomplete member list for group S123: got 2 of 3"):
+        idp.get_group("S123", fetch_count=2)
+
+
+def test_is_member_raises_instead_of_reporting_non_member_on_incomplete_list():
+    idp = _group_with_pages(
+        {"id": "S123", "totalResults": 2, "members": [{"value": "U111"}]},
+        {"id": "S123", "totalResults": 2},
+    )
+    with pytest.raises(RuntimeError, match="Incomplete"):
+        idp.is_member("U222", group_id="S123")
+
+
+@pytest.mark.parametrize("payload,match", [
+    ({"id": "S999", "members": []}, "returned a record for 'S999'"),
+    ({}, "returned a record for None"),
+    ({"id": "S123", "members": "U111"}, "expected a list"),
+    ({"id": "S123", "members": [{"display": "No ID"}]}, "Malformed member entry"),
+    ({"id": "S123", "members": ["U111"]}, "Malformed member entry"),
+])
+def test_get_group_rejects_malformed_records(payload, match):
+    with pytest.raises(RuntimeError, match=match):
+        _group_with_pages(payload).get_group("S123")
+
+
+def test_get_group_treats_missing_members_as_empty_group():
+    group = _group_with_pages({"id": "S123", "displayName": "Empty"}).get_group("S123")
+    assert group["members"] == []
+
+
 # -----------------------------
 # Optional "factory-style" demo
 # -----------------------------
