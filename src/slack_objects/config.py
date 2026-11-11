@@ -14,6 +14,10 @@ CONVERSATION_ID_RE = re.compile(r"^[CGD][A-Z0-9]+$")
 # "+" precedes "\-" in the character class so it is not read as a range.
 EMAIL_RE = re.compile(r"^[\w.+\-]+@[\w.\-]+\.\w+$")
 
+# Slack accepts up to 15,000 members per SCIM Groups write but recommends batches
+# of no more than 5,000. https://docs.slack.dev/reference/scim-api/#patch-groups-id
+SCIM_GROUP_MEMBER_BATCH_LIMIT = 5000
+
 
 class RateTier(float, Enum):
 	"""

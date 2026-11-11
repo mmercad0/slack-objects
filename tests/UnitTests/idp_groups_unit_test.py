@@ -24,7 +24,9 @@ from typing import Any, Dict, Optional, Tuple
 import json
 import logging
 
+import pytest
 import requests
+from slack_objects.config import SCIM_GROUP_MEMBER_BATCH_LIMIT
 from slack_objects.rate_limits import RateLimitPolicy
 
 
@@ -395,6 +397,127 @@ def test_factory_style_if_available():
     bound.rate_policy = RateLimitPolicy(method_overrides={}, prefix_rules={}, default=0.0)
 
     assert bound.is_member("U1") is True
+
+
+# -----------------------------
+# Member removal
+# -----------------------------
+
+@pytest.fixture
+def removal_group():
+    from slack_objects.idp_groups import IDP_groups
+
+    cfg = DummyConfig()
+    group = IDP_groups(
+        cfg=cfg, client=DummySlackClient(), logger=logging.getLogger("test"),
+        api=DummyApiCaller(), scim_session=FakeScimSession({}), group_id="S123",
+    )
+    group.rate_policy = RateLimitPolicy(method_overrides={}, prefix_rules={}, default=0.0)
+    return group
+
+
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_remove_members_exact_payload_and_cache_invalidation(removal_group, version):
+    group = removal_group
+    group.cfg.scim_version = version
+    url = f"{_scim_base(group.cfg)}Groups/S123"
+    remaining = {"id": "S123", "displayName": "Admins", "members": [{"value": "U333"}]}
+    group.scim_session.routes = {("PATCH", url): (200, remaining), ("GET", url): (200, remaining)}
+    group.attributes = {"id": "S123", "members": [{"value": "U111"}, {"value": "U333"}]}
+
+    response = group.remove_members(["U111", "U222", "U111"])
+
+    expected = (
+        {"schemas": ["urn:scim:schemas:core:1.0"], "members": [
+            {"value": "U111", "operation": "delete"}, {"value": "U222", "operation": "delete"},
+        ]} if version == "v1" else
+        {"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{
+            "op": "remove", "path": "members", "value": [{"value": "U111"}, {"value": "U222"}],
+        }]}
+    )
+    assert response.ok
+    assert group.scim_session.calls == [("PATCH", url, None, expected)]
+    assert group.attributes == {}
+    assert group.members == [{"value": "U333"}]
+    assert len(group.scim_session.calls) == 2
+
+
+@pytest.mark.parametrize("user_ids", [[], "U111", ["../U111"], [""], [None], ["S123"], ["U111", "bad\"id"]])
+def test_remove_members_rejects_invalid_input_without_http(removal_group, user_ids):
+    with pytest.raises(ValueError):
+        removal_group.remove_members(user_ids)
+    assert removal_group.scim_session.calls == []
+
+
+def test_remove_members_requires_valid_group_and_version(removal_group):
+    with pytest.raises(ValueError):
+        removal_group.remove_members(["U111"], "../S123")
+    removal_group.group_id = None
+    with pytest.raises(ValueError):
+        removal_group.remove_members(["U111"])
+    removal_group.group_id = "S123"
+    removal_group.cfg.scim_version = "v3"
+    with pytest.raises(NotImplementedError, match="Invalid SCIM version"):
+        removal_group.remove_members(["U111"])
+    assert removal_group.scim_session.calls == []
+
+
+def test_remove_members_enforces_batch_limit(removal_group):
+    with pytest.raises(ValueError, match=str(SCIM_GROUP_MEMBER_BATCH_LIMIT)):
+        removal_group.remove_members([f"U{i}" for i in range(SCIM_GROUP_MEMBER_BATCH_LIMIT + 1)])
+    assert removal_group.scim_session.calls == []
+
+
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_remove_members_accepts_exactly_batch_limit_unique_ids(removal_group, version):
+    group = removal_group
+    group.cfg.scim_version = version
+    url = f"{_scim_base(group.cfg)}Groups/S123"
+    group.scim_session.routes = {("PATCH", url): (204, {})}
+    ids = [f"U{i}" for i in range(SCIM_GROUP_MEMBER_BATCH_LIMIT)]
+    assert group.remove_members(ids + ids).ok
+    payload = group.scim_session.calls[0][3]
+    members = payload["members"] if version == "v1" else payload["Operations"][0]["value"]
+    assert len(members) == SCIM_GROUP_MEMBER_BATCH_LIMIT
+    assert [member["value"] for member in members] == ids
+
+
+@pytest.mark.parametrize("status,payload", [(400, {"Errors": [{"description": "denied"}]}), (200, {"Errors": [{"description": "failed"}]})])
+def test_remove_members_surfaces_errors_and_invalidates_cache(removal_group, status, payload):
+    group = removal_group
+    group.attributes = {"id": "S123", "members": [{"value": "U111"}]}
+    url = f"{_scim_base(group.cfg)}Groups/S123"
+    group.scim_session.routes = {("PATCH", url): (status, payload)}
+    if status == 400:
+        with pytest.raises(requests.HTTPError):
+            group.remove_members(["U111"])
+    else:
+        assert not group.remove_members(["U111"]).ok
+    assert group.attributes == {}
+
+
+def test_remove_members_explicit_group_does_not_invalidate_other_group(removal_group):
+    group = removal_group
+    cached = {"id": "S123", "members": [{"value": "U111"}]}
+    group.attributes = cached
+    url = f"{_scim_base(group.cfg)}Groups/S456"
+    group.scim_session.routes = {("PATCH", url): (204, {})}
+    assert group.remove_members(["U111"], group_id="S456").ok
+    assert group.attributes == cached
+    assert group.scim_session.calls[0][1] == url
+
+
+def test_remove_members_transport_failure_invalidates_cache(removal_group, monkeypatch):
+    group = removal_group
+    group.attributes = {"id": "S123", "members": [{"value": "U111"}]}
+
+    def timeout(*args, **kwargs):
+        raise requests.Timeout("Timed out after sending PATCH")
+
+    monkeypatch.setattr(group.scim_session, "request", timeout)
+    with pytest.raises(requests.Timeout):
+        group.remove_members(["U111"])
+    assert group.attributes == {}
 
 
 # -----------------------------

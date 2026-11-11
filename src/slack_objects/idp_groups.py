@@ -15,6 +15,7 @@ This module implements the following functionality:
 - get a single group's full SCIM record (name, members, metadata)
 - get members of a given group
 - check whether a user is a member of a group
+- remove selected members without replacing the group's membership
 
 Design decisions
 ----------------
@@ -35,6 +36,7 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from .base import SlackObjectBase
+from .config import SCIM_GROUP_MEMBER_BATCH_LIMIT, USER_ID_RE
 from .scim_base import ScimMixin, ScimResponse, validate_scim_id
 
 
@@ -145,6 +147,44 @@ class IDP_groups(ScimMixin, SlackObjectBase):
             params["startIndex"] = start_index
         # Pass params only when set, so the default call is byte-for-byte the legacy request.
         return self._scim_request(path=f"Groups/{group_id}", method="GET", params=params or None)      # https://docs.slack.dev/reference/scim-api/#get-groups-id
+
+    def _scim_group_remove_members(self, group_id: str, user_ids: List[str]) -> ScimResponse:
+        """
+        Wrapper for PATCH Groups/{id} that removes only the specified members.
+        Builds the version-specific payload (v2 PatchOp ``remove`` or v1 ``operation: delete``).
+        """
+        validate_scim_id(group_id, "group_id")
+        if not isinstance(user_ids, list) or not user_ids:
+            raise ValueError("user_ids must be a non-empty list of Slack user IDs")
+        for user_id in user_ids:
+            if not isinstance(user_id, str) or not USER_ID_RE.fullmatch(user_id):
+                raise ValueError(f"Invalid user_id: {user_id!r}")
+        unique_ids = list(dict.fromkeys(user_ids))
+        if len(unique_ids) > SCIM_GROUP_MEMBER_BATCH_LIMIT:
+            raise ValueError(
+                f"Remove no more than {SCIM_GROUP_MEMBER_BATCH_LIMIT} unique members per call "
+                "(Slack's recommended SCIM batch size)"
+            )
+
+        scim_version = self.cfg.scim_version
+        if scim_version == "v2":
+            payload: Dict[str, Any] = {
+                "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                "Operations": [{
+                    "op": "remove",
+                    "path": "members",
+                    "value": [{"value": uid} for uid in unique_ids],
+                }],
+            }
+        elif scim_version == "v1":
+            payload = {
+                "schemas": ["urn:scim:schemas:core:1.0"],
+                "members": [{"value": uid, "operation": "delete"} for uid in unique_ids],
+            }
+        else:
+            raise NotImplementedError(f"Invalid SCIM version: {scim_version}")
+
+        return self._scim_request(path=f"Groups/{group_id}", method="PATCH", payload=payload)      # https://docs.slack.dev/reference/scim-api/#patch-groups-id
 
     # ---------- public helpers ----------
 
@@ -262,3 +302,30 @@ class IDP_groups(ScimMixin, SlackObjectBase):
             if member.get("value") == user_id:
                 return True
         return False
+
+    def remove_members(self, user_ids: List[str], group_id: Optional[str] = None) -> ScimResponse:
+        """
+        Remove selected Slack users from a passed or bound IdP group (via SCIM PATCH).
+
+        Never uses PUT or DELETE Groups, so other members and group fields are left
+        untouched. Accepts at most ``SCIM_GROUP_MEMBER_BATCH_LIMIT`` unique user IDs;
+        an empty list is rejected so a call can never be an unqualified removal.
+        This changes Slack's group, not the upstream identity provider.
+
+        Cached attributes for the group are invalidated after every attempt, including
+        transport failures where the server may still have applied the change.
+
+        Returns:
+            ScimResponse; callers must check ``ok``.
+
+        Raises:
+            ValueError on invalid IDs or batch size.
+            NotImplementedError on an unsupported SCIM version.
+            requests.HTTPError on non-2xx responses.
+        """
+        gid = self._resolve_group_id(group_id)
+        try:
+            return self._scim_group_remove_members(gid, user_ids)
+        finally:
+            if self.attributes.get("id") == gid:
+                self.attributes = {}
